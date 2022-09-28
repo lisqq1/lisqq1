@@ -853,9 +853,9 @@ action=$1
 #[[ -z $2 ]] && read -p "请输入vps的序号" intt
 #((intt=$action-1))
 [[ -z $1 ]] && exit 
-
+((intt=$action-1))
 case "$action" in
-	[0-6]) ((intt=$action-1)) && auto ;;
+	[0-6]) auto ;;
 	update | uninstall | start | restart | stop | showLog | sshdconfig) ${action} ;;
 	*) exit  ;;
 esac
