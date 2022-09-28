@@ -822,12 +822,9 @@ net.ipv6.conf.lo.disable_ipv6 = 0" >>/etc/sysctl.d/99-sysctl.conf
 }
 
 sshdconfig() {
-     red "开始ssh免密"
      if [[ ! -f ~/.ssh/authorized_keys ]]; then
-          red "开始下载密钥"
           wget -N --no-check-certificate -O ~/id_rsa.pub https://raw.githubusercontent.com/lisqq1/lisqq1/main/sshd_key
      else
-          red "退出"
           return
      fi
 	mkdir .ssh && cat ~/id_rsa.pub > ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
