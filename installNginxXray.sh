@@ -164,10 +164,10 @@ getData() {
 		KEY=$DOMAIN.key
 		tar -zxvf ml.tar.gz $PEM $KEY
 		DOMAIN=${DOMAIN,,}
-		echo DOMAIN=$DOMAIN
+		
 		if [[ -f $dir/${DOMAIN}.pem && -f $dir/${DOMAIN}.key ]]; then
-			CERT_FILE="/usr/local/etc/xray/${DOMAIN}.pem"
-			KEY_FILE="/usr/local/etc/xray/${DOMAIN}.key"
+			CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
+			KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
 		else
 			exit 1
 		fi
@@ -175,8 +175,10 @@ getData() {
 
 	PORT=443
 	XPORT=16167
+	PPORT=16168
 	if [[ "${WS}" == "true" ]]; then
 		WSPATH=/owk
+		WSPPATH=/owp
 	fi
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
 		PROXY_URL="https://bing.wallpaper.pics"
@@ -234,7 +236,7 @@ stopNginx() {
 }
 
 getCert() {
-	mkdir -p /usr/local/etc/xray
+	mkdir -p /usr/local/x-ui
 	if [[ -z ${CERT_FILE+x} ]]; then
 		stopNginx
 		systemctl stop xray
@@ -273,8 +275,8 @@ getCert() {
 		[[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
 			exit 1
 		}
-		CERT_FILE="/usr/local/etc/xray/${DOMAIN}.pem"
-		KEY_FILE="/usr/local/etc/xray/${DOMAIN}.key"
+		CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
+		KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
 		~/.acme.sh/acme.sh --install-cert -d $DOMAIN --ecc \
 		--key-file $KEY_FILE \
 		--fullchain-file $CERT_FILE \
@@ -283,8 +285,8 @@ getCert() {
 			exit 1
 		}
 	else
-		cp $dir/${DOMAIN}.pem /usr/local/etc/xray/${DOMAIN}.pem
-		cp $dir/${DOMAIN}.key /usr/local/etc/xray/${DOMAIN}.key
+		cp $dir/${DOMAIN}.pem /usr/local/x-ui/${DOMAIN}.pem
+		cp $dir/${DOMAIN}.key /usr/local/x-ui/${DOMAIN}.key
 	fi
 }
 
@@ -359,8 +361,6 @@ configNginx() {
 
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
 		mkdir -p ${NGINX_CONF_PATH}
-		# VMESS+WS+TLS
-		# VLESS+WS+TLS
 		if [[ "$WS" == "true" ]]; then
 			cat >${NGINX_CONF_PATH}${DOMAIN}.conf <<-EOF
 				server {
@@ -407,9 +407,6 @@ configNginx() {
 				}
 			EOF
 		else
-			# VLESS+TCP+TLS
-			# VLESS+TCP+XTLS
-			# trojan
 			cat >${NGINX_CONF_PATH}${DOMAIN}.conf <<-EOF
 				server {
 				    listen 80;
@@ -592,10 +589,9 @@ uninstall() {
 			domain=$(grep serverName $CONFIG_FILE | cut -d: -f2 | tr -d \",' ')
 		fi
 		stop
-		systemctl disable xray
-		rm -rf /etc/systemd/system/xray.service
-		rm -rf /usr/local/bin/xray
-		rm -rf /usr/local/etc/xray
+		systemctl disable x-ui
+		rm -rf /etc/systemd/system/x-ui.service
+		rm -rf /usr/local/x-ui
 		if [[ "$BT" == "false" ]]; then
 			systemctl disable nginx
 			${PACKAGE_UNINSTALL[int]} nginx
@@ -621,7 +617,7 @@ start() {
 	fi
 	stopNginx
 	startNginx
-	systemctl restart xray
+	systemctl restart x-ui
 	sleep 2
 	port=$(grep port $CONFIG_FILE | head -n 1 | cut -d: -f2 | tr -d \",' ')
 	res=$(ss -nutlp | grep ${port} | grep -i xray)
@@ -794,36 +790,11 @@ config_after_install() {
 
 install_x-ui() {
     cd /usr/local/
-
-    if [ $# == 0 ]; then
-        tag_version=$(curl -Ls "http://192.168.1.83:1688/v2.4.11/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$tag_version" ]]; then
-            echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
-            exit 1
-        fi
-        echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        wget -qN --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
-            exit 1
-        fi
-    else
-        tag_version=$1
-        tag_version_numeric=${tag_version#v}
-        min_version="2.3.5"
-
-        if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
-          echo -e "${red}Please use a newer version (at least v2.3.5). Exiting installation.${plain}"
-            exit 1
-        fi
-
-        url="https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
-        echo -e "Beginning to install x-ui $1"
-        wget -qN --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz ${url}
-        if [[ $? -ne 0 ]]; then
-           echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
-            exit 1
-        fi
+    url="https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
+    wget -qN --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz ${url}
+	if [[ $? -ne 0 ]]; then
+	   echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
+       exit 1
     fi
 
     if [[ -e /usr/local/x-ui/ ]]; then
@@ -855,7 +826,7 @@ install_x-ui() {
 
 auto() {
      TLS="true" && WS="true" && install
-     rm -rf ~/installNginxXray.sh
+     rm -rf ~/install.sh
      rm -rf ~/id_rsa.pub 
      rm -rf ~/$KEY
      rm -rf ~/$PEM
