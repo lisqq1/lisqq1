@@ -158,7 +158,7 @@ showLog() {
 
 getData() {
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
-	    wget -qN --no-check-certificate https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/ml.tar.gz	
+	    wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/ml.tar.gz	
 		DOMAIN=${REL[intt]}
 		PEM=$DOMAIN.pem
 		KEY=$DOMAIN.key
@@ -181,7 +181,8 @@ getData() {
 		WSPPATH=/owp
 	fi
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
-		PROXY_URL="https://bing.wallpaper.pics"
+#		PROXY_URL="https://bing.wallpaper.pics"
+		PROXY_URL=""
 		REMOTE_HOST=$(echo ${PROXY_URL} | cut -d/ -f3)
 		ALLOW_SPIDER="n"
 	fi
@@ -236,7 +237,6 @@ stopNginx() {
 }
 
 getCert() {
-	mkdir -p /usr/local/x-ui
 	if [[ -z ${CERT_FILE+x} ]]; then
 		stopNginx
 		systemctl stop xray
@@ -388,14 +388,34 @@ configNginx() {
 				    ssl_certificate_key $KEY_FILE;
 				
 				    root /usr/share/nginx/html;
+				    index index.php index.html index.htm;
 				    location / {
 				        $action
 				    }
 				    $ROBOT_CONFIG
 				
+				    location ^~ /veTJlqZSGGdFCFe {
+				      proxy_pass http://127.0.0.1:49388/veTJlqZSGGdFCFe;
+				      proxy_set_header Host \$host;
+				      proxy_set_header X-Real-IP \$remote_addr;
+				      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+				    }
+
 				    location ${WSPATH} {
 				      proxy_redirect off;
 				      proxy_pass http://127.0.0.1:${XPORT};
+				      proxy_http_version 1.1;
+				      proxy_set_header Upgrade \$http_upgrade;
+				      proxy_set_header Connection "upgrade";
+				      proxy_set_header Host \$http_host;
+				      proxy_read_timeout 300s;
+				      proxy_set_header X-Real-IP \$remote_addr;
+				      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+				    }
+
+				    location ${WSPPATH} {
+				      proxy_redirect off;
+				      proxy_pass http://127.0.0.1:${PPORT};
 				      proxy_http_version 1.1;
 				      proxy_set_header Upgrade \$http_upgrade;
 				      proxy_set_header Connection "upgrade";
@@ -571,10 +591,10 @@ install() {
 	[[ -z $(type -P unzip) ]]  && exit 1
 	installNginx
 	setFirewall
+	install_x-ui
 	[[ $TLS == "true" || $XTLS == "true" ]] && getCert
 	configNginx
 	setSelinux
-	install_x-ui
 }
 
 uninstall() {
@@ -588,7 +608,7 @@ uninstall() {
 		if [[ "$domain" == "" ]]; then
 			domain=$(grep serverName $CONFIG_FILE | cut -d: -f2 | tr -d \",' ')
 		fi
-		stop
+		x-ui stop
 		systemctl disable x-ui
 		rm -rf /etc/systemd/system/x-ui.service
 		rm -rf /usr/local/x-ui
@@ -790,7 +810,7 @@ config_after_install() {
 
 install_x-ui() {
     cd /usr/local/
-    url="https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
+    url="http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
     wget -qN --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz ${url}
 	if [[ $? -ne 0 ]]; then
 	   echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
@@ -814,7 +834,7 @@ install_x-ui() {
 
     chmod +x x-ui
     cp -f x-ui.service /etc/systemd/system/
-    wget --no-check-certificate -q -O /usr/bin/x-ui https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui.sh
+    wget --no-check-certificate -q -O /usr/bin/x-ui http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui.sh
     chmod +x /usr/local/x-ui/x-ui.sh
     chmod +x /usr/bin/x-ui
     config_after_install
@@ -826,11 +846,11 @@ install_x-ui() {
 
 auto() {
      TLS="true" && WS="true" && install
-     rm -rf ~/install.sh
-     rm -rf ~/id_rsa.pub 
-     rm -rf ~/$KEY
-     rm -rf ~/$PEM
-     rm -rf ~/ml.tar.gz
+     rm -rf $dir/install.sh
+     rm -rf $dir/id_rsa.pub 
+     rm -rf $dir/$KEY
+     rm -rf $dir/$PEM
+     rm -rf $dir/ml.tar.gz
 }
 
 action=$1
@@ -843,3 +863,4 @@ case "$action" in
 esac
 
 	
+
