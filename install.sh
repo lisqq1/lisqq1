@@ -292,6 +292,12 @@ getCert() {
 
 configNginx() {
 	mkdir -p /usr/share/nginx/html
+	cd /usr/share/nginx/html/ && rm -f ./*
+    wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/fakesite.zip
+    unzip -o fakesite.zip
+	
+	rm -f fakesite.zip
+	
 	if [[ "$ALLOW_SPIDER" == "n" ]]; then
 		echo 'User-Agent: *' >/usr/share/nginx/html/robots.txt
 		echo 'Disallow: /' >>/usr/share/nginx/html/robots.txt
