@@ -1,34 +1,106 @@
 #!/bin/bash
 
+# 打印红色
 red() {
-	echo -e "\033[31m\033[01m$1\033[0m"
+  echo -e "\033[31m\033[01m$1\033[0m"
 }
 
+# 打印绿色
 green() {
-	echo -e "\033[32m\033[01m$1\033[0m"
+  echo -e "\033[32m\033[01m$1\033[0m"
 }
 
+# 打印黄色
 yellow() {
-	echo -e "\033[33m\033[01m$1\033[0m"
+  echo -e "\033[33m\033[01m$1\033[0m"
 }
 
+# 颜色常量
 RED="\033[31m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
-BLUE="\033[36m"
 PLAIN='\033[0m'
 
-REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "'amazon linux'")
+# 系统信息匹配的正则表达式
+REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "amazon linux")
 RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS")
-PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update" "yum -y update")
-PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install")
-PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove")
 REL=("usuv.us.kg" "usur.us.kg" "lisqq.us.kg")
-RELL=("7728e8d8-d065-4df4-f8bb-bc564913b6f9" "12d4281f-db3b-441c-b78d-41708a6c9978" "785a1d5a-036b-4102-8576-fd0f8e0c144b" "c77c7360-6d7f-4045-8146-8926dee4292a" "7c00e53f-8e6a-4a12-bd05-0403a29f17cf" "6810d320-44f8-49c0-9efb-ed9d4754967b")
-[[ $EUID -ne 0 ]] && red "请在root用户下运行脚本" && exit 1
+#RELL=("7728e8d8-d065-4df4-f8bb-bc564913b6f9" "12d4281f-db3b-441c-b78d-41708a6c9978" "785a1d5a-036b-4102-8576-fd0f8e0c144b" "c77c7360-6d7f-4045-8146-8926dee4292a" "7c00e53f-8e6a-4a12-bd05-0403a29f17cf" "6810d320-44f8-49c0-9efb-ed9d4754967b")
 
-dir=$(pwd)
-CMD=("$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d \" -f2)" "$(hostnamectl 2>/dev/null | grep -i system | cut -d : -f2)" "$(lsb_release -sd 2>/dev/null)" "$(grep -i description /etc/lsb-release 2>/dev/null | cut -d \" -f2)" "$(grep . /etc/redhat-release 2>/dev/null)" "$(grep . /etc/issue 2>/dev/null | cut -d \\ -f1 | sed '/^[ ]*$/d')")
+# 定义常用命令和包管理器
+declare -A PACKAGE_UPDATE=(
+  ["debian"]="apt -y update"
+  ["ubuntu"]="apt -y update"
+  ["centos"]="yum -y update"
+  ["redhat"]="yum -y update"
+  ["amazon"]="yum -y update"
+)
+
+declare -A PACKAGE_INSTALL=(
+  ["debian"]="apt -y install"
+  ["ubuntu"]="apt -y install"
+  ["centos"]="yum -y install"
+  ["redhat"]="yum -y install"
+  ["amazon"]="yum -y install"
+)
+
+declare -A PACKAGE_UNINSTALL=(
+  ["debian"]="apt -y autoremove"
+  ["ubuntu"]="apt -y autoremove"
+  ["centos"]="yum -y autoremove"
+  ["redhat"]="yum -y autoremove"
+  ["amazon"]="yum -y autoremove"
+)
+
+# 检查是否是root用户
+if [[ $EUID -ne 0 ]]; then
+  red "请以 root 用户身份运行脚本"
+  exit 1
+fi
+
+# 获取操作系统信息
+OS_NAME=$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d '=' -f2 | tr -d '"')
+if [[ -z "$OS_NAME" ]]; then
+  OS_NAME=$(hostnamectl 2>/dev/null | grep -i system | cut -d ':' -f2 | tr -d ' ')
+fi
+
+# 如果未能获取系统信息，则退出
+if [[ -z "$OS_NAME" ]]; then
+  red "无法识别操作系统"
+  exit 1
+fi
+
+# 输出操作系统信息
+echo -e "检测到的操作系统：$OS_NAME"
+
+# 根据操作系统名称选择相应的包管理器命令
+case "$OS_NAME" in
+  *Debian*|*Ubuntu*)
+    DISTRO="debian"
+    ;;
+  *CentOS*|*Red\ Hat*|*Oracle\ Linux*|*Alma*|*Rocky*)
+    DISTRO="centos"
+    ;;
+  *Amazon*)
+    DISTRO="amazon"
+    ;;
+  *)
+    red "未支持的操作系统: $OS_NAME"
+    exit 1
+    ;;
+esac
+
+# 更新包
+green "正在更新系统包..."
+${PACKAGE_UPDATE[$DISTRO]}
+
+# 安装常见包示例
+# green "正在安装curl..."
+# ${PACKAGE_INSTALL[$DISTRO]} curl
+
+# 移除不需要的包示例
+# green "正在移除不需要的包..."
+# ${PACKAGE_UNINSTALL[$DISTRO]}
 
 SITES=(
 	http://www.zhuizishu.com/
@@ -45,15 +117,38 @@ SITES=(
 	http://www.tjwl.com/
 )
 
+# 获取当前工作目录
+dir=$(pwd)
+
+# 配置文件路径
 CONFIG_FILE="/usr/local/x-ui/bin/config.json"
 
-IP=$(curl -s6m8 ip.sb) || IP=$(curl -s4m8 ip.sb)
+# 获取外部IP（IPv6优先，IPv4备选）
+IP=$(curl -s6m8 ip.sb || curl -s4m8 ip.sb)
 
+# 检查 IP 是否成功获取
+if [[ -z "$IP" ]]; then
+  echo "无法获取IP地址，请检查网络连接或代理设置。"
+  exit 1
+fi
+
+# 输出获取到的 IP 地址
+echo "获取的外部IP地址: $IP"
+
+# 初始化变量
 BT="false"
-NGINX_CONF_PATH="/etc/nginx/conf.d/" 
-res=$(which bt 2>/dev/null) 
-[[ "$res" != "" ]] && BT="true" && NGINX_CONF_PATH="/www/server/panel/vhost/nginx/"    
+NGINX_CONF_PATH="/etc/nginx/conf.d/"
 
+# 检查是否安装宝塔面板
+if command -v bt &>/dev/null; then
+  BT="true"
+  NGINX_CONF_PATH="/www/server/panel/vhost/nginx/"
+  echo "检测到宝塔面板，nginx 配置路径已更新为: $NGINX_CONF_PATH"
+else
+  echo "未检测到宝塔面板，nginx 配置路径保持为默认: $NGINX_CONF_PATH"
+fi
+
+# 协议标志初始化
 VLESS="false"
 TROJAN="false"
 TLS="false"
@@ -61,16 +156,33 @@ WS="false"
 XTLS="false"
 KCP="false"
 
-for i in "${CMD[@]}"; do
-	SYS="$i" && [[ -n $SYS ]] && break
-done
+# 获取操作系统信息
+get_system_info() {
+    for i in "${OS_NAME[@]}"; do
+        [[ -n "$i" ]] && echo "$i" && return
+    done
+}
 
-for ((int = 0; int < ${#REGEX[@]}; int++)); do
-	[[ $(echo "$SYS" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && [[ -n $SYSTEM ]] && break
-done
+# 匹配操作系统
+detect_system() {
+    local system_info="$1"
+    for ((int = 0; int < ${#REGEX[@]}; int++)); do
+        if [[ $(echo "$system_info" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[$int]} ]]; then
+            echo "${RELEASE[$int]}"
+            return
+        fi
+    done
+}
 
-[[ -z $SYSTEM ]] && red "不支持当前VPS系统，请使用主流的操作系统" && exit 1
-[[ -z $(type -P curl) ]] && ${PACKAGE_UPDATE[int]} && ${PACKAGE_INSTALL[int]} curl
+# 安装 curl
+install_curl() {
+    if [[ -z $(type -P curl) ]]; then
+        green "curl 未安装，正在安装..."
+        ${PACKAGE_UPDATE[$DISTRO]} && ${PACKAGE_INSTALL[$DISTRO]} curl
+    else
+        green "curl 已安装"
+    fi
+}
 
 configNeedNginx() {
 	local ws=$(grep wsSettings $CONFIG_FILE)
@@ -83,117 +195,172 @@ needNginx() {
 	echo yes
 }
 
+# 获取架构信息
 archAffix() {
-	case "$(uname -m)" in
-		i686 | i386) echo '32' ;;
-		x86_64 | amd64) echo '64' ;;
-		armv5tel) echo 'arm32-v5' ;;
-		armv6l) echo 'arm32-v6' ;;
-		armv7 | armv7l) echo 'arm32-v7a' ;;
-		armv8 | aarch64) echo 'arm64-v8a' ;;
-		mips64le) echo 'mips64le' ;;
-		mips64) echo 'mips64' ;;
-		mipsle) echo 'mips32le' ;;
-		mips) echo 'mips32' ;;
-		ppc64le) echo 'ppc64le' ;;
-		ppc64) echo 'ppc64' ;;
-		ppc64le) echo 'ppc64le' ;;
-		riscv64) echo 'riscv64' ;;
-		s390x) echo 's390x' ;;
-		*) red " 不支持的CPU架构！" && exit 1 ;;
-	esac
+    case "$(uname -m)" in
+        i686 | i386) echo '32' ;;
+        x86_64 | amd64) echo '64' ;;
+        armv5tel) echo 'arm32-v5' ;;
+        armv6l) echo 'arm32-v6' ;;
+        armv7 | armv7l) echo 'arm32-v7a' ;;
+        armv8 | aarch64) echo 'arm64-v8a' ;;
+        mips64le) echo 'mips64le' ;;
+        mips64) echo 'mips64' ;;
+        mipsle) echo 'mips32le' ;;
+        mips) echo 'mips32' ;;
+        ppc64le) echo 'ppc64le' ;;
+        ppc64) echo 'ppc64' ;;
+        riscv64) echo 'riscv64' ;;
+        s390x) echo 's390x' ;;
+        *) red "不支持的CPU架构！" && exit 1 ;;
+    esac
 	return 0
 }
 
+# 检查 CentOS 8 并升级到 CentOS Stream 8
 checkCentOS8() {
-	if [[ -n $(cat /etc/os-release | grep "CentOS Linux 8") ]]; then
-		yellow "检测到当前VPS系统为CentOS 8，是否升级为CentOS Stream 8以确保软件包正常安装？"
-		comfirmCentOSStream=y
-		if [[ $comfirmCentOSStream == "y" ]]; then
-			sleep 1
-			sed -i -e "s|releasever|releasever-stream|g" /etc/yum.repos.d/CentOS-*
-			yum clean all && yum makecache
-			dnf swap centos-linux-repos centos-stream-repos distro-sync -y
-		else
-			exit 1
-		fi
-	fi
+    if grep -iq "CentOS Linux 8" /etc/os-release; then
+        yellow "检测到当前VPS系统为 CentOS 8，是否升级为 CentOS Stream 8 以确保软件包正常安装？"
+        read -p "请输入 'y' 以确认升级，或其他任意键取消： " comfirmCentOSStream
+        if [[ $comfirmCentOSStream == "y" ]]; then
+            echo "正在升级至 CentOS Stream 8..."
+            sleep 1
+            sed -i -e "s|releasever|releasever-stream|g" /etc/yum.repos.d/CentOS-*
+            yum clean all && yum makecache
+            dnf swap centos-linux-repos centos-stream-repos distro-sync -y
+            green "CentOS 升级至 CentOS Stream 8 完成！"
+        else
+            echo "升级已取消。"
+            exit 1
+        fi
+    fi
 }
 
 status() {
-	[[ ! -f /usr/local/x-ui/bin/xray-linux-amd64 ]] && echo 0 && return
-	[[ ! -f $CONFIG_FILE ]] && echo 1 && return
-	port=$(grep port $CONFIG_FILE | head -n 1 | cut -d: -f2 | tr -d \",' ')
-	res=$(ss -nutlp | grep ${port} | grep -i xray)
-	[[ -z "$res" ]] && echo 2 && return
+    # 检查 xray 是否存在
+    if [[ ! -f /usr/local/x-ui/bin/xray-linux-amd64 ]]; then
+        echo 0
+        return
+    fi
 
-	if [[ $(configNeedNginx) != "yes" ]]; then
-		echo 3
-	else
-		res=$(ss -nutlp | grep -i nginx)
-		if [[ -z "$res" ]]; then
-			echo 4
-		else
-			echo 5
-		fi
-	fi
+    # 检查配置文件是否存在
+    if [[ ! -f $CONFIG_FILE ]]; then
+        echo 1
+        return
+    fi
+
+    # 获取 xray 配置中的端口
+    port=$(grep -oP '"port":\s*\K\d+' $CONFIG_FILE)
+
+    # 检查端口是否被 xray 占用
+    if ! ss -nutlp | grep -q ":$port"; then
+        echo 2
+        return
+    fi
+
+    # 判断是否需要 Nginx 配置
+    if [[ $(configNeedNginx) != "yes" ]]; then
+        echo 3
+    else
+        # 检查 Nginx 是否运行
+        if ss -nutlp | grep -iq nginx; then
+            echo 5
+        else
+            echo 4
+        fi
+    fi
 }
 
 statusText() {
-	res=$(status)
-	case $res in
-		2) echo -e ${GREEN}已安装${PLAIN} ${RED}未运行${PLAIN} ;;
-		3) echo -e ${GREEN}已安装${PLAIN} ${GREEN}Xray正在运行${PLAIN} ;;
-		4) echo -e ${GREEN}已安装${PLAIN} ${GREEN}Xray正在运行${PLAIN}, ${RED}Nginx未运行${PLAIN} ;;
-		5) echo -e ${GREEN}已安装${PLAIN} ${GREEN}Xray正在运行, Nginx正在运行${PLAIN} ;;
-		*) echo -e ${RED}未安装${PLAIN} ;;
-	esac
+    local res
+    res=$(status)
+
+    # 定义颜色输出
+    local green="${GREEN}已安装${PLAIN}"
+    local red="${RED}未运行${PLAIN}"
+    local running="${GREEN}正在运行${PLAIN}"
+
+    case $res in
+        2) echo -e "$green $red" ;;
+        3) echo -e "$green $running" ;;
+        4) echo -e "$green $running, $red Nginx未运行${PLAIN}" ;;
+        5) echo -e "$green $running, Nginx正在运行${PLAIN}" ;;
+        *) echo -e "${RED}未安装${PLAIN}" ;;
+    esac
 }
 
 showLog() {
-	res=$(status)
-	[[ $res -lt 2 ]] && red "Xray未安装，请先安装！" && exit 1
-	journalctl -xen -u xray --no-pager
+    # 获取 Xray 的状态
+    local res
+    res=$(status)
+
+    # 如果 Xray 未安装，提示并退出
+    if [[ $res -lt 2 ]]; then
+        red "Xray未安装，请先安装！"
+        exit 1
+    fi
+
+    # 显示 Xray 服务日志
+    journalctl -xe -u xray --no-pager
 }
 
 getData() {
-	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
-	    wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/ml.tar.gz	
+    # 下载证书文件，如果启用了 TLS 或 XTLS
+    if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
+        # 下载并解压证书
 		DOMAIN=${REL[intt]}
-		PEM=$DOMAIN.pem
-		KEY=$DOMAIN.key
-		tar -zxvf ml.tar.gz $PEM $KEY
-		DOMAIN=${DOMAIN,,}
-		
-		if [[ -f $dir/${DOMAIN}.pem && -f $dir/${DOMAIN}.key ]]; then
-			CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
-			KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
-		else
-			exit 1
+        PEM="${DOMAIN}.pem"
+        KEY="${DOMAIN}.key"
+        
+		if [[ ! -f ml.tar.gz ]]; then
+			wget -qN --no-check-certificate "http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/ml.tar.gz"
 		fi
-	fi
+        
+        # 解压证书文件
+        tar -zxvf ml.tar.gz "$PEM" "$KEY"
+        
+        # 转小写
+        DOMAIN="${DOMAIN,,}"
 
-	PORT=443
-	XPORT=16167
-	PPORT=16168
-	if [[ "${WS}" == "true" ]]; then
-		WSPATH=/owk
-		WSPPATH=/owp
-	fi
-	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
-#		PROXY_URL="https://bing.wallpaper.pics"
-		PROXY_URL=""
-		REMOTE_HOST=$(echo ${PROXY_URL} | cut -d/ -f3)
-		ALLOW_SPIDER="n"
-	fi
+        # 检查文件是否解压成功
+        if [[ -f "$dir/${DOMAIN}.pem" && -f "$dir/${DOMAIN}.key" ]]; then
+            CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
+            KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
+        else
+            echo "证书文件下载失败，退出！"
+            exit 1
+        fi
+    fi
+
+    # 设置端口
+    PORT=443
+    XPORT=16167
+    PPORT=16168
+
+    # 如果启用了 WebSocket，设置路径
+    if [[ "$WS" == "true" ]]; then
+        WSPATH="/owk"
+        WSPPATH="/owp"
+    fi
+
+    # 配置代理和远程主机
+    if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
+        PROXY_URL=""
+        REMOTE_HOST=$(echo "$PROXY_URL" | cut -d/ -f3)
+        ALLOW_SPIDER="n"
+    fi
 }
 
 installNginx() {
-	httpd=$(netstat -ntlp | grep -E ':80 |:443 ' |cut -d "/" -f2)
-	${PACKAGE_UNINSTALL[int]} $httpd
+    # 检查是否有服务占用 80 或 443 端口，若有则卸载
+    local httpd
+    httpd=$(netstat -ntlp | grep -E ':80|:443' | cut -d "/" -f2)
+    [[ -n "$httpd" ]] && ${PACKAGE_UNINSTALL[$DISTRO]} "$httpd"
+
+	# 根据系统安装 Nginx
 	if [[ "$BT" == "false" ]]; then
 		if [[ $SYSTEM == "CentOS" ]]; then
-			${PACKAGE_INSTALL[int]} epel-release
+			${PACKAGE_INSTALL[$DISTRO]} epel-release
 			if [[ "$?" != "0" ]]; then
 				echo '[nginx-stable]
 name=nginx stable repo
@@ -204,17 +371,12 @@ gpgkey=https://nginx.org/keys/nginx_signing.key
 module_hotfixes=true' >/etc/yum.repos.d/nginx.repo
 			fi
 		fi
-		${PACKAGE_INSTALL[int]} nginx
-		if [[ "$?" != "0" ]]; then
-			exit 1
-		fi
-		systemctl enable nginx
-	else
-		res=$(which nginx 2>/dev/null)
-		if [[ "$?" != "0" ]]; then
-			exit 1
-		fi
-	fi
+        ${PACKAGE_INSTALL[$DISTRO]} nginx || exit 1
+        systemctl enable nginx
+    else
+        # 在宝塔环境下，检查 Nginx 是否已安装
+        which nginx &>/dev/null || exit 1
+    fi
 }
 
 startNginx() {
@@ -226,96 +388,125 @@ startNginx() {
 }
 
 stopNginx() {
-	if [[ "$BT" == "false" ]]; then
-		systemctl stop nginx
-	else
-		res=$(ps aux | grep -i nginx)
-		if [[ "$res" != "" ]]; then
-			nginx -s stop
-		fi
-	fi
+    if [[ "$BT" == "false" ]]; then
+        systemctl stop nginx
+    else
+        # 检查 Nginx 是否正在运行，若是则停止
+        pgrep -x nginx &>/dev/null && nginx -s stop
+    fi
 }
 
 getCert() {
-	if [[ -z ${CERT_FILE+x} ]]; then
-		stopNginx
-		systemctl stop xray
-		res=$(netstat -ntlp | grep -E ':80 |:443 ')
-		if [[ "${res}" != "" ]]; then
-			exit 1
-		fi
-		${PACKAGE_INSTALL[int]} socat openssl
-		if [[ $SYSTEM == "CentOS" ]]; then
-			${PACKAGE_INSTALL[int]} cronie
-			systemctl start crond
-			systemctl enable crond
-		else
-			${PACKAGE_INSTALL[int]} cron
-			systemctl start cron
-			systemctl enable cron
-		fi
-		autoEmail=$(date +%s%N | md5sum | cut -c 1-32)
-		curl -sL https://get.acme.sh | sh -s email=$autoEmail@gmail.com
-		source ~/.bashrc
-		~/.acme.sh/acme.sh --upgrade --auto-upgrade
-		~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-		if [[ $BT == "false" ]]; then
-			if [[ -n $(curl -sm8 ip.sb | grep ":") ]]; then
-				~/.acme.sh/acme.sh --issue -d $DOMAIN --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx" --standalone --listen-v6
-			else
-				~/.acme.sh/acme.sh --issue -d $DOMAIN --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx" --standalone
-			fi
-		else
-			if [[ -n $(curl -sm8 ip.sb | grep ":") ]]; then
-				~/.acme.sh/acme.sh --issue -d $DOMAIN --keylength ec-256 --pre-hook "nginx -s stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }" --standalone --listen-v6
-			else
-				~/.acme.sh/acme.sh --issue -d $DOMAIN --keylength ec-256 --pre-hook "nginx -s stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }" --standalone
-			fi
-		fi
-		[[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
-			exit 1
-		}
-		CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
-		KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
-		~/.acme.sh/acme.sh --install-cert -d $DOMAIN --ecc \
-		--key-file $KEY_FILE \
-		--fullchain-file $CERT_FILE \
-		--reloadcmd "service nginx force-reload"
-		[[ -f $CERT_FILE && -f $KEY_FILE ]] || {
-			exit 1
-		}
-	else
-		cp $dir/${DOMAIN}.pem /usr/local/x-ui/${DOMAIN}.pem
-		cp $dir/${DOMAIN}.key /usr/local/x-ui/${DOMAIN}.key
-	fi
+    # 如果证书文件尚未定义，则开始获取证书
+    if [[ -z ${CERT_FILE+x} ]]; then
+        # 停止相关服务
+        stopNginx
+        systemctl stop xray
+
+        # 检查端口是否被占用
+        if netstat -ntlp | grep -E ':80|:443' &>/dev/null; then
+            echo "端口 80 或 443 已被占用，退出！"
+            exit 1
+        fi
+
+        # 安装必要的软件包
+        ${PACKAGE_INSTALL[$DISTRO]} socat openssl
+        if [[ "$SYSTEM" == "CentOS" ]]; then
+            ${PACKAGE_INSTALL[$DISTRO]} cronie
+            systemctl enable --now crond
+        else
+            ${PACKAGE_INSTALL[$DISTRO]} cron
+            systemctl enable --now cron
+        fi
+
+        # 创建自动化邮件
+        autoEmail=$(date +%s%N | md5sum | cut -c 1-32)
+        curl -sL https://get.acme.sh | sh -s email="$autoEmail@gmail.com"
+        source ~/.bashrc
+        ~/.acme.sh/acme.sh --upgrade --auto-upgrade
+        ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+
+        # 根据 IP 类型处理证书申请
+        cert_cmd="~/.acme.sh/acme.sh --issue -d $DOMAIN --keylength ec-256 --standalone"
+        post_hook="--post-hook \"systemctl restart nginx\""
+
+        # 判断是否支持 IPv6
+        if curl -sm8 ip.sb | grep -q ":"; then
+            cert_cmd="$cert_cmd --listen-v6"
+        fi
+
+        # 处理不同环境的预钩子
+        if [[ "$BT" == "false" ]]; then
+            cert_cmd="$cert_cmd --pre-hook \"systemctl stop nginx\" $post_hook"
+        else
+            cert_cmd="$cert_cmd --pre-hook \"nginx -s stop || { echo -n ''; }\" $post_hook"
+        fi
+
+        # 执行证书申请命令
+        eval "$cert_cmd"
+
+        # 检查证书文件是否生成成功
+        if [[ ! -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]]; then
+            echo "证书申请失败！"
+            exit 1
+        fi
+
+        # 安装证书
+        CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
+        KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
+        ~/.acme.sh/acme.sh --install-cert -d $DOMAIN --ecc \
+            --key-file "$KEY_FILE" \
+            --fullchain-file "$CERT_FILE" \
+            --reloadcmd "service nginx force-reload"
+
+        # 验证证书文件是否安装成功
+        if [[ ! -f "$CERT_FILE" || ! -f "$KEY_FILE" ]]; then
+            echo "证书安装失败！"
+            exit 1
+        fi
+    else
+        # 如果证书已经存在，则直接复制
+        cp "$dir/${DOMAIN}.pem" "/usr/local/x-ui/${DOMAIN}.pem"
+        cp "$dir/${DOMAIN}.key" "/usr/local/x-ui/${DOMAIN}.key"
+    fi
 }
 
 configNginx() {
-	mkdir -p /usr/share/nginx/html
-	cd /usr/share/nginx/html/ && rm -f ./*
-    wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/fakesite.zip
-    unzip -o fakesite.zip
-	
-	rm -f fakesite.zip
-	
-	if [[ "$ALLOW_SPIDER" == "n" ]]; then
-		echo 'User-Agent: *' >/usr/share/nginx/html/robots.txt
-		echo 'Disallow: /' >>/usr/share/nginx/html/robots.txt
-		ROBOT_CONFIG="    location = /robots.txt {}"
-	else
-		ROBOT_CONFIG=""
-	fi
+    # 创建并清空网站根目录
+    mkdir -p /usr/share/nginx/html
+    cd /usr/share/nginx/html/ && rm -f ./*
 
+    # 下载并解压 fakesite.zip，仅当文件不存在时下载
+    if [[ ! -f fakesite.zip ]]; then
+        wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/fakesite.zip
+        unzip -o fakesite.zip
+        rm -f fakesite.zip
+    fi
+
+    # 设置 robots.txt，防止搜索引擎抓取
+    if [[ "$ALLOW_SPIDER" == "n" ]]; then
+        echo 'User-Agent: *' > /usr/share/nginx/html/robots.txt
+        echo 'Disallow: /' >> /usr/share/nginx/html/robots.txt
+        ROBOT_CONFIG="    location = /robots.txt {}"
+    else
+        ROBOT_CONFIG=""
+    fi
+
+    # 备份 nginx 配置文件（如果不存在）
 	if [[ "$BT" == "false" ]]; then
 		if [[ ! -f /etc/nginx/nginx.conf.bak ]]; then
 			mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
 		fi
+		
+		# 获取 nginx 用户
 		res=$(id nginx 2>/dev/null)
 		if [[ "$?" != "0" ]]; then
 			user="www-data"
 		else
 			user="nginx"
 		fi
+		
+		# 生成基本的 nginx 配置
 		cat >/etc/nginx/nginx.conf <<-EOF
 			user $user;
 			worker_processes auto;
@@ -354,7 +545,8 @@ configNginx() {
 			}
 		EOF
 	fi
-
+	
+	# 处理反向代理配置
 	if [[ "$PROXY_URL" == "" ]]; then
 		action=""
 	else
@@ -364,7 +556,8 @@ configNginx() {
         sub_filter \"$REMOTE_HOST\" \"$DOMAIN\";
         sub_filter_once off;"
 	fi
-
+	
+	# 配置 TLS/XTLS 相关内容
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
 		mkdir -p ${NGINX_CONF_PATH}
 		if [[ "$WS" == "true" ]]; then
@@ -433,6 +626,7 @@ configNginx() {
 				}
 			EOF
 		else
+		    # 不使用 WebSocket 配置
 			cat >${NGINX_CONF_PATH}${DOMAIN}.conf <<-EOF
 				server {
 				    listen 80;
@@ -451,422 +645,404 @@ configNginx() {
 }
 
 setSelinux() {
-	if [[ -s /etc/selinux/config ]] && grep 'SELINUX=enforcing' /etc/selinux/config; then
-		sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
-		setenforce 0
-	fi
+    # 检查并修改 SELinux 配置
+    if [[ -s /etc/selinux/config && $(grep -i 'SELINUX=enforcing' /etc/selinux/config) ]]; then
+        sed -i 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+        setenforce 0
+        green "SELinux已设置为permissive模式，系统无需重启生效。"
+    else
+        green "SELinux已经是非强制模式或未配置。"
+    fi
 }
 
 setFirewall() {
-	res=$(which firewall-cmd 2>/dev/null)
-	if [[ $? -eq 0 ]]; then
-		systemctl status firewalld >/dev/null 2>&1
-		if [[ $? -eq 0 ]]; then
-			firewall-cmd --permanent --add-service=http
-			firewall-cmd --permanent --add-service=https
-			if [[ "$PORT" != "443" ]]; then
-				firewall-cmd --permanent --add-port=${PORT}/tcp
-				firewall-cmd --permanent --add-port=${PORT}/udp
-			fi
-			firewall-cmd --reload
-		else
-			nl=$(iptables -nL | nl | grep FORWARD | awk '{print $1}')
-			if [[ "$nl" != "3" ]]; then
-				iptables -I INPUT -p tcp --dport 80 -j ACCEPT
-				iptables -I INPUT -p tcp --dport 443 -j ACCEPT
-				if [[ "$PORT" != "443" ]]; then
-					iptables -I INPUT -p tcp --dport ${PORT} -j ACCEPT
-					iptables -I INPUT -p udp --dport ${PORT} -j ACCEPT
-				fi
-			fi
-		fi
-	else
-		res=$(which iptables 2>/dev/null)
-		if [[ $? -eq 0 ]]; then
-			nl=$(iptables -nL | nl | grep FORWARD | awk '{print $1}')
-			if [[ "$nl" != "3" ]]; then
-				iptables -I INPUT -p tcp --dport 80 -j ACCEPT
-				iptables -I INPUT -p tcp --dport 443 -j ACCEPT
-				if [[ "$PORT" != "443" ]]; then
-					iptables -I INPUT -p tcp --dport ${PORT} -j ACCEPT
-					iptables -I INPUT -p udp --dport ${PORT} -j ACCEPT
-				fi
-			fi
-		else
-			res=$(which ufw 2>/dev/null)
-			if [[ $? -eq 0 ]]; then
-				res=$(ufw status | grep -i inactive)
-				if [[ "$res" == "" ]]; then
-					ufw allow http/tcp
-					ufw allow https/tcp
-					if [[ "$PORT" != "443" ]]; then
-						ufw allow ${PORT}/tcp
-						ufw allow ${PORT}/udp
-					fi
-				fi
-			fi
-		fi
-	fi
-}
-
-vmessWSConfig() {
-	local uuid=${RELL[intt]}
-	cat >$CONFIG_FILE <<-EOF
-		{
-		  "inbounds": [{
-		    "port": $XPORT,
-		    "listen": "127.0.0.1",
-		    "protocol": "vmess",
-		    "settings": {
-		      "clients": [
-		        {
-		          "id": "$uuid",
-		          "level": 1,
-		          "alterId": 0
-		        }
-		      ],
-		      "disableInsecureEncryption": false
-		    },
-		    "streamSettings": {
-		        "network": "ws",
-		        "wsSettings": {
-		            "path": "$WSPATH",
-		            "headers": {
-		                "Host": "$DOMAIN"
-		            }
-		        }
-		    }
-		  }],
-		  "outbounds": [{
-		    "protocol": "freedom",
-		    "settings": {}
-		  },{
-		    "protocol": "blackhole",
-		    "settings": {},
-		    "tag": "blocked"
-		  }]
-		}
-	EOF
-}
-
-vlessWSConfig() {
-	local uuid=${RELL[intt]}
-	cat >$CONFIG_FILE <<-EOF
-		{
-		  "log" : {
-		    "loglevel": "warning"
-		  },
-		  "inbounds": [{
-		    "port": $XPORT,
-		    "listen": "127.0.0.1",
-		    "protocol": "vless",
-		    "settings": {
-		      "clients": [
-		        {
-		          "id": "$uuid",
-		          "level": 0,
-		          "email": "a@b.com"
-		        }
-		      ],
-		      "decryption": "none"
-		    },
-		    "streamSettings": {
-		        "network": "ws",
-		        "wsSettings": {
-		            "path": "$WSPATH",
-		            }
-		        }
-		    }
-		  }],
-		  "outbounds": [{
-		    "protocol": "freedom",
-		    "settings": {}
-		  }]
-		}
-	EOF
+    # Check for available firewall tool
+    if command -v firewall-cmd &>/dev/null; then
+        # Using firewalld
+        systemctl is-active --quiet firewalld && {
+            firewall-cmd --permanent --add-service=http
+            firewall-cmd --permanent --add-service=https
+            [[ "$PORT" != "443" ]] && {
+                firewall-cmd --permanent --add-port=${PORT}/tcp
+                firewall-cmd --permanent --add-port=${PORT}/udp
+            }
+            firewall-cmd --reload
+        } || {
+            # Fallback to iptables if firewalld is not active
+            iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+            iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+            [[ "$PORT" != "443" ]] && {
+                iptables -C INPUT -p tcp --dport ${PORT} -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport ${PORT} -j ACCEPT
+                iptables -C INPUT -p udp --dport ${PORT} -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport ${PORT} -j ACCEPT
+            }
+        }
+    elif command -v iptables &>/dev/null; then
+        # Using iptables
+        iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+        iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+        [[ "$PORT" != "443" ]] && {
+            iptables -C INPUT -p tcp --dport ${PORT} -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport ${PORT} -j ACCEPT
+            iptables -C INPUT -p udp --dport ${PORT} -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport ${PORT} -j ACCEPT
+        }
+    elif command -v ufw &>/dev/null; then
+        # Using UFW
+        ufw status | grep -iq inactive && ufw enable
+        ufw allow http/tcp
+        ufw allow https/tcp
+        [[ "$PORT" != "443" ]] && {
+            ufw allow ${PORT}/tcp
+            ufw allow ${PORT}/udp
+        }
+    fi
 }
 
 install() {
-	getData
-	checkCentOS8
-	${PACKAGE_UPDATE[int]}
-	${PACKAGE_INSTALL[int]} wget curl sudo vim unzip tar gcc openssl net-tools
-	if [[ $SYSTEM != "CentOS" ]]; then
-		${PACKAGE_INSTALL[int]} libssl-dev g++
-	fi
-	[[ -z $(type -P unzip) ]]  && exit 1
-	installNginx
-	setFirewall
-	install_x-ui
-	[[ $TLS == "true" || $XTLS == "true" ]] && getCert
-	configNginx
-	setSelinux
+    # Fetch necessary data and check system compatibility
+    getData
+    checkCentOS8
+
+    # Update and install required packages
+    ${PACKAGE_UPDATE[$DISTRO]}
+    ${PACKAGE_INSTALL[$DISTRO]} wget curl sudo vim unzip tar gcc openssl net-tools
+
+    # Additional packages for non-CentOS systems
+    [[ $SYSTEM != "CentOS" ]] && ${PACKAGE_INSTALL[$DISTRO]} libssl-dev g++
+
+    # Ensure 'unzip' is installed
+    [[ -z $(type -P unzip) ]] && { echo "unzip not found, exiting."; exit 1; }
+
+    # Install and configure Nginx, firewall, and x-ui
+    installNginx
+    setFirewall
+    install_x-ui
+
+    # Obtain certificates if needed
+    [[ $TLS == "true" || $XTLS == "true" ]] && getCert
+
+    # Configure Nginx and SELinux
+    configNginx
+    setSelinux
 }
 
 uninstall() {
-	res=$(status)
-	if [[ $res -lt 2 ]]; then
-		return
-	fi
-	answer=y
-	if [[ "${answer,,}" == "y" ]]; then
-		domain=$(grep Host $CONFIG_FILE | cut -d: -f2 | tr -d \",' ')
-		if [[ "$domain" == "" ]]; then
-			domain=$(grep serverName $CONFIG_FILE | cut -d: -f2 | tr -d \",' ')
-		fi
-		x-ui stop
-		systemctl disable x-ui
-		rm -rf /etc/systemd/system/x-ui.service
-		rm -rf /usr/local/x-ui
-		if [[ "$BT" == "false" ]]; then
-			systemctl disable nginx
-			${PACKAGE_UNINSTALL[int]} nginx
-			if [[ "$PMT" == "apt" ]]; then
-				${PACKAGE_UNINSTALL[int]} nginx-common
-			fi
-			rm -rf /etc/nginx/nginx.conf
-			if [[ -f /etc/nginx/nginx.conf.bak ]]; then
-				mv /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-			fi
-		fi
-		if [[ "$domain" != "" ]]; then
-			rm -rf ${NGINX_CONF_PATH}${domain}.conf
-		fi
-		[[ -f ~/.acme.sh/acme.sh ]] && ~/.acme.sh/acme.sh --uninstall
-	fi
+    # Check the status to ensure service is installed
+    res=$(status)
+    [[ $res -lt 2 ]] && return
+
+    # Ask for confirmation before proceeding
+    answer=y
+    [[ "${answer,,}" == "y" ]] && {
+        # Extract domain from config file (if exists)
+        domain=$(grep -E 'Host|serverName' $CONFIG_FILE | cut -d: -f2 | tr -d \",' ')
+
+        # Stop x-ui service and disable it
+        x-ui stop
+        systemctl disable x-ui
+        rm -rf /etc/systemd/system/x-ui.service /usr/local/x-ui
+
+        # Uninstall Nginx if not using BT (Baota)
+        if [[ "$BT" == "false" ]]; then
+            systemctl disable nginx
+            ${PACKAGE_UNINSTALL[$DISTRO]} nginx
+            [[ "$PMT" == "apt" ]] && ${PACKAGE_UNINSTALL[$DISTRO]} nginx-common
+            rm -rf /etc/nginx/nginx.conf
+
+            # Restore backup of nginx config if exists
+            [[ -f /etc/nginx/nginx.conf.bak ]] && mv /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+        fi
+
+        # Remove domain-specific Nginx config if exists
+        [[ -n "$domain" ]] && rm -rf ${NGINX_CONF_PATH}${domain}.conf
+
+        # Uninstall SSL certificates if present
+        [[ -f ~/.acme.sh/acme.sh ]] && ~/.acme.sh/acme.sh --uninstall
+    }
 }
 
 start() {
-	res=$(status)
-	if [[ $res -lt 2 ]]; then
-		return
-	fi
-	stopNginx
-	startNginx
-	systemctl restart x-ui
-	sleep 2
-	port=$(grep port $CONFIG_FILE | head -n 1 | cut -d: -f2 | tr -d \",' ')
-	res=$(ss -nutlp | grep ${port} | grep -i xray)
-	if [[ "$res" == "" ]]; then
-		echo "Xray启动失败，请检查日志或查看端口是否被占用！" >/dev/null
-	fi
+    # Check if service is installed and running
+    res=$(status)
+    [[ $res -lt 2 ]] && return
+
+    # Stop and start Nginx service, then restart x-ui
+    stopNginx
+    startNginx
+    systemctl restart x-ui
+    sleep 2
+
+    # Check if Xray is listening on the specified port
+    port=$(grep port $CONFIG_FILE | head -n 1 | cut -d: -f2 | tr -d \",' ')
+    res=$(ss -nutlp | grep ${port} | grep -i xray)
+
+    # If Xray is not running, log the error
+    [[ -z "$res" ]] && echo "Xray启动失败，请检查日志或查看端口是否被占用！" >/dev/null
 }
 
 stop() {
-	stopNginx
-	systemctl stop xray
+    # Stop Nginx and Xray services
+    stopNginx
+    systemctl stop xray
 }
 
 restart() {
-	res=$(status)
-	if [[ $res -lt 2 ]]; then
-		return
-	fi
-	stop
-	start
+    # Restart the service (stop then start)
+    res=$(status)
+    [[ $res -lt 2 ]] && return
+    stop
+    start
 }
 
 setdns64() {
-	if [[ -n $(curl -s6m8 https://ip.gs) ]]; then
-		echo -e nameserver 2a01:4f8:c2c:123f::1 >/etc/resolv.conf
-	fi
+    # Check if IPv6 connectivity is available using a 6-second timeout
+    if curl -s6m8 https://ip.gs >/dev/null; then
+        # Set the DNS server to a specific IPv6 address
+        echo "nameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
+        echo "IPv6 DNS server set successfully."
+    else
+        # Inform user if IPv6 connectivity is not detected
+        echo "No IPv6 connectivity detected. DNS configuration remains unchanged."
+    fi
 }
 
 system_optimize() {
-	if [ ! -f "/etc/sysctl.conf" ]; then
-		touch /etc/sysctl.conf
-	fi
-	sed -i '/net.ipv4.tcp_retries2/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_slow_start_after_idle/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_fastopen/d' /etc/sysctl.conf
-	sed -i '/fs.file-max/d' /etc/sysctl.conf
-	sed -i '/fs.inotify.max_user_instances/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_fin_timeout/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_tw_reuse/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_max_syn_backlog/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.ip_local_port_range/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_max_tw_buckets/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.route.gc_timeout/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_synack_retries/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_syn_retries/d' /etc/sysctl.conf
-	sed -i '/net.core.somaxconn/d' /etc/sysctl.conf
-	sed -i '/net.core.netdev_max_backlog/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.tcp_max_orphans/d' /etc/sysctl.conf
-	sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
+    # Check if sysctl.conf exists, if not, create it
+    [ ! -f "/etc/sysctl.conf" ] && touch /etc/sysctl.conf
 
-	echo "net.ipv4.tcp_retries2 = 8
-	net.ipv4.tcp_slow_start_after_idle = 0
-	fs.file-max = 1000000
-	fs.inotify.max_user_instances = 8192
-	net.ipv4.tcp_syncookies = 1
-	net.ipv4.tcp_fin_timeout = 30
-	net.ipv4.tcp_tw_reuse = 1
-	net.ipv4.ip_local_port_range = 1024 65000
-	net.ipv4.tcp_max_syn_backlog = 16384
-	net.ipv4.tcp_max_tw_buckets = 6000
-	net.ipv4.route.gc_timeout = 100
-	net.ipv4.tcp_syn_retries = 1
-	net.ipv4.tcp_synack_retries = 1
-	net.core.somaxconn = 32768
-	net.core.netdev_max_backlog = 32768
-	net.ipv4.tcp_timestamps = 0
-	net.ipv4.tcp_max_orphans = 32768
-	# forward ipv4
-	#net.ipv4.ip_forward = 1" >>/etc/sysctl.conf
-	sysctl -p
-	echo "*               soft    nofile           1000000
-	*               hard    nofile          1000000" >/etc/security/limits.conf
-	echo "ulimit -SHn 1000000" >>/etc/profile
-	read -p "需要重启VPS，系统优化配置才能生效，是否现在重启？ [Y/n] :" yn
-	[[ -z $yn ]] && yn="y"
-	if [[ $yn == [Yy] ]]; then
-		yellow "VPS 重启中..."
-		reboot
-	fi
+    # Remove existing configurations to avoid duplicates
+    sed -i '/net.ipv4.tcp_retries2/d; 
+            /net.ipv4.tcp_slow_start_after_idle/d;
+            /net.ipv4.tcp_fastopen/d; 
+            /fs.file-max/d;
+            /fs.inotify.max_user_instances/d;
+            /net.ipv4.tcp_syncookies/d;
+            /net.ipv4.tcp_fin_timeout/d;
+            /net.ipv4.tcp_tw_reuse/d;
+            /net.ipv4.tcp_max_syn_backlog/d;
+            /net.ipv4.ip_local_port_range/d;
+            /net.ipv4.tcp_max_tw_buckets/d;
+            /net.ipv4.route.gc_timeout/d;
+            /net.ipv4.tcp_synack_retries/d;
+            /net.ipv4.tcp_syn_retries/d;
+            /net.core.somaxconn/d;
+            /net.core.netdev_max_backlog/d;
+            /net.ipv4.tcp_timestamps/d;
+            /net.ipv4.tcp_max_orphans/d;
+            /net.ipv4.ip_forward/d' /etc/sysctl.conf
+
+    # Add optimized kernel parameters
+    cat >> /etc/sysctl.conf <<EOF
+net.ipv4.tcp_retries2 = 8
+net.ipv4.tcp_slow_start_after_idle = 0
+fs.file-max = 1000000
+fs.inotify.max_user_instances = 8192
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.ip_local_port_range = 1024 65000
+net.ipv4.tcp_max_syn_backlog = 16384
+net.ipv4.tcp_max_tw_buckets = 6000
+net.ipv4.route.gc_timeout = 100
+net.ipv4.tcp_syn_retries = 1
+net.ipv4.tcp_synack_retries = 1
+net.core.somaxconn = 32768
+net.core.netdev_max_backlog = 32768
+net.ipv4.tcp_timestamps = 0
+net.ipv4.tcp_max_orphans = 32768
+# Forward ipv4
+# net.ipv4.ip_forward = 1
+EOF
+
+    # Apply the new sysctl settings
+    sysctl -p
+
+    # Set user limits
+    echo "*               soft    nofile           1000000
+*               hard    nofile           1000000" > /etc/security/limits.conf
+
+    # Apply the ulimit settings
+    echo "ulimit -SHn 1000000" >> /etc/profile
+
+    # Prompt for reboot
+    read -p "系统优化配置已完成。是否立即重启VPS？ [Y/n] :" yn
+    yn=${yn:-y}  # Default to 'y' if input is empty
+
+    if [[ $yn =~ ^[Yy]$ ]]; then
+        echo "VPS 重启中..."
+        reboot
+    fi
 }
 
+# Open all ports and disable firewall rules
 open_ports() {
-	systemctl stop firewalld.service
-	systemctl disable firewalld.service
-	setenforce 0
-	ufw disable
-	iptables -P INPUT ACCEPT
-	iptables -P FORWARD ACCEPT
-	iptables -P OUTPUT ACCEPT
-	iptables -t nat -F
-	iptables -t mangle -F
-	iptables -F
-	iptables -X
-	netfilter-persistent save
-	yellow "VPS中的所有网络端口已开启"
+    # Stop and disable firewalld and ufw services
+    systemctl stop firewalld.service && systemctl disable firewalld.service
+    setenforce 0  # Disable SELinux enforcement
+    ufw disable   # Disable UFW firewall if installed
+    
+    # Clear all iptables rules and set policies to ACCEPT
+    iptables -P INPUT ACCEPT
+    iptables -P FORWARD ACCEPT
+    iptables -P OUTPUT ACCEPT
+    iptables -t nat -F
+    iptables -t mangle -F
+    iptables -F
+    iptables -X
+
+    # Save iptables configurations
+    netfilter-persistent save
+    yellow "VPS中的所有网络端口已开启"
 }
 
-#禁用IPv6
+# Disable IPv6
 closeipv6() {
-	clear
-	sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-	sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-	sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-	sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf
-	sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf
-	sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.conf
+    clear
+    # Remove any existing IPv6 disable configurations
+    sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf /etc/sysctl.d/99-sysctl.conf
+    sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf /etc/sysctl.d/99-sysctl.conf
+    sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.conf /etc/sysctl.d/99-sysctl.conf
 
-	echo "net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-net.ipv6.conf.lo.disable_ipv6 = 1" >>/etc/sysctl.d/99-sysctl.conf
-	sysctl --system
-	green "禁用IPv6结束，可能需要重启！"
+    # Add IPv6 disable configuration
+    echo -e "net.ipv6.conf.all.disable_ipv6 = 1\nnet.ipv6.conf.default.disable_ipv6 = 1\nnet.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.d/99-sysctl.conf
+    
+    # Apply changes
+    sysctl --system
+    green "禁用IPv6结束，可能需要重启！"
 }
 
-#开启IPv6
+# Enable IPv6
 openipv6() {
-	clear
-	sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-	sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-	sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-	sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf
-	sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf
-	sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.conf
+    clear
+    # Remove any existing IPv6 disable configurations
+    sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf /etc/sysctl.d/99-sysctl.conf
+    sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf /etc/sysctl.d/99-sysctl.conf
+    sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.conf /etc/sysctl.d/99-sysctl.conf
 
-	echo "net.ipv6.conf.all.disable_ipv6 = 0
-net.ipv6.conf.default.disable_ipv6 = 0
-net.ipv6.conf.lo.disable_ipv6 = 0" >>/etc/sysctl.d/99-sysctl.conf
-	sysctl --system
-	green "开启IPv6结束，可能需要重启！"
+    # Add IPv6 enable configuration
+    echo -e "net.ipv6.conf.all.disable_ipv6 = 0\nnet.ipv6.conf.default.disable_ipv6 = 0\nnet.ipv6.conf.lo.disable_ipv6 = 0" >> /etc/sysctl.d/99-sysctl.conf
+    
+    # Apply changes
+    sysctl --system
+    green "开启IPv6结束，可能需要重启！"
 }
 
 gen_random_string() {
+    # Ensure length is a positive integer
     local length="$1"
-    local random_string=$(LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w "$length" | head -n 1)
-    echo "$random_string"
+    if [[ ! "$length" =~ ^[0-9]+$ ]] || ((length <= 0)); then
+        echo "Error: Length must be a positive integer"
+        return 1
+    fi
+    
+    # Efficient random string generation using /dev/urandom and tr
+    tr -dc 'a-zA-Z0-9' </dev/urandom | head -c "$length"
 }
 
+# Configurations after installation
 config_after_install() {
-    local existing_username=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'username: .+' | awk '{print $2}')
-    local existing_password=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'password: .+' | awk '{print $2}')
-    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}')
-    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
-    local server_ip=$(curl -s https://api.ipify.org)
-
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
-        if [[ "$existing_username" == "admin" && "$existing_password" == "admin" ]]; then
-            local config_webBasePath="veTJlqZSGGdFCFe"
-            local config_username="lisqq"
-            local config_password="liqwerty1234@@"
-
-            local config_port="49388"
-
-            /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
-        else
-            local config_webBasePath="veTJlqZSGGdFCFe"
-            /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}"
-        fi
-    else
-        if [[ "$existing_username" == "admin" && "$existing_password" == "admin" ]]; then
-            local config_username="lisqq"
-            local config_password="liqwerty1234@@"
-            /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}"
-        fi
-    fi
-
+    local config_webBasePath="veTJlqZSGGdFCFe"
+    local config_username="lisqq"
+    local config_password="liqwerty1234@@"
+    local config_port="49388"
+    /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
     /usr/local/x-ui/x-ui migrate
 }
 
+# Install x-ui
 install_x-ui() {
     cd /usr/local/
     url="http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
-    wget -qN --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz ${url}
-	if [[ $? -ne 0 ]]; then
-	   echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
-       exit 1
+    wget -qN --no-check-certificate -O "x-ui-linux-$(archAffix).tar.gz" "$url"
+
+    # Check download status
+    if [[ $? -ne 0 ]]; then
+        echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
+        exit 1
     fi
 
+    # Clean previous x-ui installation if exists
     if [[ -e /usr/local/x-ui/ ]]; then
         systemctl stop x-ui
-        rm /usr/local/x-ui/ -rf
+        rm -rf /usr/local/x-ui/
     fi
 
-    tar zxvf x-ui-linux-$(archAffix).tar.gz
-    rm x-ui-linux-$(archAffix).tar.gz -f
+    # Extract and install x-ui
+    tar zxvf "x-ui-linux-$(archAffix).tar.gz"
+    rm -f "x-ui-linux-$(archAffix).tar.gz"
     cd x-ui
     chmod +x x-ui
-	
+
+    # Rename binary if architecture is 64-bit
     if [[ $(archAffix) == "64" ]]; then
         mv bin/xray-linux-$(archAffix) bin/xray-linux-amd64
         chmod +x bin/xray-linux-amd64
     fi
 
+    # Make x-ui executable and configure it
     chmod +x x-ui
     cp -f x-ui.service /etc/systemd/system/
+
+    # Download and setup x-ui script
     wget --no-check-certificate -q -O /usr/bin/x-ui http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui.sh
-    chmod +x /usr/local/x-ui/x-ui.sh
-    chmod +x /usr/bin/x-ui
+    chmod +x /usr/local/x-ui/x-ui.sh /usr/bin/x-ui
+
+    # Configure settings after installation
     config_after_install
 
+    # Enable and start x-ui service
     systemctl daemon-reload
     systemctl enable x-ui
     systemctl start x-ui
 }
 
 auto() {
-     TLS="true" && WS="true" && install
-     rm -rf $dir/install.sh
-     rm -rf $dir/id_rsa.pub 
-     rm -rf $dir/$KEY
-     rm -rf $dir/$PEM
-     rm -rf $dir/ml.tar.gz
+    # Set TLS and WS, then call install
+    TLS="true" WS="true" install
+	systemctl restart nginx
+
+    # Safely remove files if they exist
+    local files=(
+        "$dir/install.sh"
+        "$dir/id_rsa.pub"
+        "$dir/$KEY"
+        "$dir/$PEM"
+        "$dir/ml.tar.gz"
+    )
+    
+    for file in "${files[@]}"; do
+        [[ -f $file ]] && rm -rf "$file"
+    done
 }
 
-action=$1
-[[ -z $1 ]] && exit 
+# 下载curl
+# 判断操作系统
+SYS=$(get_system_info)
+SYSTEM=$(detect_system "$SYS")
+
+# 如果未识别到操作系统，给出错误提示并退出
+if [[ -z $SYSTEM ]]; then
+    red "不支持当前VPS系统，请使用主流的操作系统"
+    exit 1
+fi
+
+# 输出识别的操作系统
+green "检测到操作系统: $SYSTEM"
+
+# 安装 curl
+install_curl
+
+# Ensure action is provided, exit if not
+action="$1"
+[[ -z "$action" ]] && action="1"
 ((intt=$action-1))
+# Process action
 case "$action" in
-	[1-3]) auto ;;
-	install | uninstall | start | stop | restart | install_x-ui | sshdconfig | showLog) ${action} ;;
-	*) exit  ;;
+    [1-3]) auto ;;
+    install | uninstall | start | stop | restart | install_x-ui | sshdconfig | showLog)
+        # Execute the corresponding function
+        "$action" ;;
+    *)
+        # Invalid action, exit
+        exit 1 ;;
 esac
 
-	
 

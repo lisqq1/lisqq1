@@ -23,22 +23,12 @@ RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS")
 PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update" "yum -y update")
 PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install")
 PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove")
-REL=("tblore.ml" "tblove.ml" "tbloye.ml" "usuv.cf" "usuv.ml" "seeove.tk")
+REL=("usuv.us.kg" "usur.us.kg" "lisqq.us.kg")
 RELL=("7728e8d8-d065-4df4-f8bb-bc564913b6f9" "12d4281f-db3b-441c-b78d-41708a6c9978" "785a1d5a-036b-4102-8576-fd0f8e0c144b" "c77c7360-6d7f-4045-8146-8926dee4292a" "7c00e53f-8e6a-4a12-bd05-0403a29f17cf" "6810d320-44f8-49c0-9efb-ed9d4754967b")
 [[ $EUID -ne 0 ]] && red "请在root用户下运行脚本" && exit 1
 
+dir=$(pwd)
 CMD=("$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d \" -f2)" "$(hostnamectl 2>/dev/null | grep -i system | cut -d : -f2)" "$(lsb_release -sd 2>/dev/null)" "$(grep -i description /etc/lsb-release 2>/dev/null | cut -d \" -f2)" "$(grep . /etc/redhat-release 2>/dev/null)" "$(grep . /etc/issue 2>/dev/null | cut -d \\ -f1 | sed '/^[ ]*$/d')")
-
-for i in "${CMD[@]}"; do
-	SYS="$i" && [[ -n $SYS ]] && break
-done
-
-for ((int = 0; int < ${#REGEX[@]}; int++)); do
-	[[ $(echo "$SYS" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && [[ -n $SYSTEM ]] && break
-done
-
-[[ -z $SYSTEM ]] && red "不支持当前VPS系统，请使用主流的操作系统" && exit 1
-[[ -z $(type -P curl) ]] && ${PACKAGE_UPDATE[int]} && ${PACKAGE_INSTALL[int]} curl
 
 SITES=(
 	http://www.zhuizishu.com/
@@ -55,7 +45,7 @@ SITES=(
 	http://www.tjwl.com/
 )
 
-CONFIG_FILE="/usr/local/etc/xray/config.json"
+CONFIG_FILE="/usr/local/x-ui/bin/config.json"
 
 IP=$(curl -s6m8 ip.sb) || IP=$(curl -s4m8 ip.sb)
 
@@ -70,6 +60,50 @@ TLS="false"
 WS="false"
 XTLS="false"
 KCP="false"
+
+for i in "${CMD[@]}"; do
+	SYS="$i" && [[ -n $SYS ]] && break
+done
+
+for ((int = 0; int < ${#REGEX[@]}; int++)); do
+	[[ $(echo "$SYS" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && [[ -n $SYSTEM ]] && break
+done
+
+[[ -z $SYSTEM ]] && red "不支持当前VPS系统，请使用主流的操作系统" && exit 1
+[[ -z $(type -P curl) ]] && ${PACKAGE_UPDATE[int]} && ${PACKAGE_INSTALL[int]} curl
+
+configNeedNginx() {
+	local ws=$(grep wsSettings $CONFIG_FILE)
+	[[ -z "$ws" ]] && echo no && return
+	echo yes
+}
+
+needNginx() {
+	[[ "$WS" == "false" ]] && echo no && return
+	echo yes
+}
+
+archAffix() {
+	case "$(uname -m)" in
+		i686 | i386) echo '32' ;;
+		x86_64 | amd64) echo '64' ;;
+		armv5tel) echo 'arm32-v5' ;;
+		armv6l) echo 'arm32-v6' ;;
+		armv7 | armv7l) echo 'arm32-v7a' ;;
+		armv8 | aarch64) echo 'arm64-v8a' ;;
+		mips64le) echo 'mips64le' ;;
+		mips64) echo 'mips64' ;;
+		mipsle) echo 'mips32le' ;;
+		mips) echo 'mips32' ;;
+		ppc64le) echo 'ppc64le' ;;
+		ppc64) echo 'ppc64' ;;
+		ppc64le) echo 'ppc64le' ;;
+		riscv64) echo 'riscv64' ;;
+		s390x) echo 's390x' ;;
+		*) red " 不支持的CPU架构！" && exit 1 ;;
+	esac
+	return 0
+}
 
 checkCentOS8() {
 	if [[ -n $(cat /etc/os-release | grep "CentOS Linux 8") ]]; then
@@ -86,19 +120,8 @@ checkCentOS8() {
 	fi
 }
 
-configNeedNginx() {
-	local ws=$(grep wsSettings $CONFIG_FILE)
-	[[ -z "$ws" ]] && echo no && return
-	echo yes
-}
-
-needNginx() {
-	[[ "$WS" == "false" ]] && echo no && return
-	echo yes
-}
-
 status() {
-	[[ ! -f /usr/local/bin/xray ]] && echo 0 && return
+	[[ ! -f /usr/local/x-ui/bin/xray-linux-amd64 ]] && echo 0 && return
 	[[ ! -f $CONFIG_FILE ]] && echo 1 && return
 	port=$(grep port $CONFIG_FILE | head -n 1 | cut -d: -f2 | tr -d \",' ')
 	res=$(ss -nutlp | grep ${port} | grep -i xray)
@@ -127,69 +150,24 @@ statusText() {
 	esac
 }
 
-normalizeVersion() {
-	latestXrayVer=v$(curl -Ls "https://data.jsdelivr.com/v1/package/resolve/gh/XTLS/Xray-core" | grep '"version":' | sed -E 's/.*"([^"]+)".*/\1/')
-	if [ -n "$1" ]; then
-		case "$1" in
-			v*) echo "$1" ;;
-			http*) echo $latestXrayVer ;;
-			*) echo "v$1" ;;
-		esac
-	else
-		echo ""
-	fi
-}
-
-# 1: new Xray. 0: no. 1: yes. 2: not installed. 3: check failed.
-getVersion() {
-	VER=$(/usr/local/bin/xray version 2>/dev/null | head -n1 | awk '{print $2}')
-	RETVAL=$?
-	CUR_VER="$(normalizeVersion "$(echo "$VER" | head -n 1 | cut -d " " -f2)")"
-	TAG_URL="https://data.jsdelivr.com/v1/package/resolve/gh/XTLS/Xray-core"
-	NEW_VER="$(normalizeVersion "$(curl -s "${TAG_URL}" --connect-timeout 10 | grep 'version' | cut -d\" -f4)")"
-	if [[ $? -ne 0 ]] || [[ $NEW_VER == "" ]]; then
-		return 3
-	elif [[ $RETVAL -ne 0 ]]; then
-		return 2
-	elif [[ $NEW_VER != $CUR_VER ]]; then
-		return 1
-	fi
-	return 0
-}
-
-archAffix() {
-	case "$(uname -m)" in
-		i686 | i386) echo '32' ;;
-		x86_64 | amd64) echo '64' ;;
-		armv5tel) echo 'arm32-v5' ;;
-		armv6l) echo 'arm32-v6' ;;
-		armv7 | armv7l) echo 'arm32-v7a' ;;
-		armv8 | aarch64) echo 'arm64-v8a' ;;
-		mips64le) echo 'mips64le' ;;
-		mips64) echo 'mips64' ;;
-		mipsle) echo 'mips32le' ;;
-		mips) echo 'mips32' ;;
-		ppc64le) echo 'ppc64le' ;;
-		ppc64) echo 'ppc64' ;;
-		ppc64le) echo 'ppc64le' ;;
-		riscv64) echo 'riscv64' ;;
-		s390x) echo 's390x' ;;
-		*) red " 不支持的CPU架构！" && exit 1 ;;
-	esac
-	return 0
+showLog() {
+	res=$(status)
+	[[ $res -lt 2 ]] && red "Xray未安装，请先安装！" && exit 1
+	journalctl -xen -u xray --no-pager
 }
 
 getData() {
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
-	     wget -N --no-check-certificate https://raw.githubusercontent.com/lisqq1/lisqq1/main/ml.tar.gz	
+	    wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/ml.tar.gz	
 		DOMAIN=${REL[intt]}
 		PEM=$DOMAIN.pem
 		KEY=$DOMAIN.key
 		tar -zxvf ml.tar.gz $PEM $KEY
 		DOMAIN=${DOMAIN,,}
-		if [[ -f ~/${DOMAIN}.pem && -f ~/${DOMAIN}.key ]]; then
-			CERT_FILE="/usr/local/etc/xray/${DOMAIN}.pem"
-			KEY_FILE="/usr/local/etc/xray/${DOMAIN}.key"
+		
+		if [[ -f $dir/${DOMAIN}.pem && -f $dir/${DOMAIN}.key ]]; then
+			CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
+			KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
 		else
 			exit 1
 		fi
@@ -197,11 +175,14 @@ getData() {
 
 	PORT=443
 	XPORT=16167
+	PPORT=16168
 	if [[ "${WS}" == "true" ]]; then
 		WSPATH=/owk
+		WSPPATH=/owp
 	fi
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
-		PROXY_URL="https://bing.wallpaper.pics"
+#		PROXY_URL="https://bing.wallpaper.pics"
+		PROXY_URL=""
 		REMOTE_HOST=$(echo ${PROXY_URL} | cut -d/ -f3)
 		ALLOW_SPIDER="n"
 	fi
@@ -256,7 +237,6 @@ stopNginx() {
 }
 
 getCert() {
-	mkdir -p /usr/local/etc/xray
 	if [[ -z ${CERT_FILE+x} ]]; then
 		stopNginx
 		systemctl stop xray
@@ -295,8 +275,8 @@ getCert() {
 		[[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
 			exit 1
 		}
-		CERT_FILE="/usr/local/etc/xray/${DOMAIN}.pem"
-		KEY_FILE="/usr/local/etc/xray/${DOMAIN}.key"
+		CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
+		KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
 		~/.acme.sh/acme.sh --install-cert -d $DOMAIN --ecc \
 		--key-file $KEY_FILE \
 		--fullchain-file $CERT_FILE \
@@ -305,13 +285,19 @@ getCert() {
 			exit 1
 		}
 	else
-		cp ~/${DOMAIN}.pem /usr/local/etc/xray/${DOMAIN}.pem
-		cp ~/${DOMAIN}.key /usr/local/etc/xray/${DOMAIN}.key
+		cp $dir/${DOMAIN}.pem /usr/local/x-ui/${DOMAIN}.pem
+		cp $dir/${DOMAIN}.key /usr/local/x-ui/${DOMAIN}.key
 	fi
 }
 
 configNginx() {
 	mkdir -p /usr/share/nginx/html
+	cd /usr/share/nginx/html/ && rm -f ./*
+    wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/fakesite.zip
+    unzip -o fakesite.zip
+	
+	rm -f fakesite.zip
+	
 	if [[ "$ALLOW_SPIDER" == "n" ]]; then
 		echo 'User-Agent: *' >/usr/share/nginx/html/robots.txt
 		echo 'Disallow: /' >>/usr/share/nginx/html/robots.txt
@@ -381,8 +367,6 @@ configNginx() {
 
 	if [[ "$TLS" == "true" || "$XTLS" == "true" ]]; then
 		mkdir -p ${NGINX_CONF_PATH}
-		# VMESS+WS+TLS
-		# VLESS+WS+TLS
 		if [[ "$WS" == "true" ]]; then
 			cat >${NGINX_CONF_PATH}${DOMAIN}.conf <<-EOF
 				server {
@@ -410,11 +394,19 @@ configNginx() {
 				    ssl_certificate_key $KEY_FILE;
 				
 				    root /usr/share/nginx/html;
+				    index index.php index.html index.htm;
 				    location / {
 				        $action
 				    }
 				    $ROBOT_CONFIG
 				
+				    location ^~ /veTJlqZSGGdFCFe {
+				      proxy_pass http://127.0.0.1:49388/veTJlqZSGGdFCFe;
+				      proxy_set_header Host \$host;
+				      proxy_set_header X-Real-IP \$remote_addr;
+				      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+				    }
+
 				    location ${WSPATH} {
 				      proxy_redirect off;
 				      proxy_pass http://127.0.0.1:${XPORT};
@@ -426,12 +418,21 @@ configNginx() {
 				      proxy_set_header X-Real-IP \$remote_addr;
 				      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
 				    }
+
+				    location ${WSPPATH} {
+				      proxy_redirect off;
+				      proxy_pass http://127.0.0.1:${PPORT};
+				      proxy_http_version 1.1;
+				      proxy_set_header Upgrade \$http_upgrade;
+				      proxy_set_header Connection "upgrade";
+				      proxy_set_header Host \$http_host;
+				      proxy_read_timeout 300s;
+				      proxy_set_header X-Real-IP \$remote_addr;
+				      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+				    }
 				}
 			EOF
 		else
-			# VLESS+TCP+TLS
-			# VLESS+TCP+XTLS
-			# trojan
 			cat >${NGINX_CONF_PATH}${DOMAIN}.conf <<-EOF
 				server {
 				    listen 80;
@@ -508,46 +509,6 @@ setFirewall() {
 	fi
 }
 
-installXray() {
-	rm -rf /tmp/xray
-	mkdir -p /tmp/xray
-	DOWNLOAD_LINK="https://github.com/XTLS/Xray-core/releases/download/${NEW_VER}/Xray-linux-$(archAffix).zip"
-	curl -L -H "Cache-Control: no-cache" -o /tmp/xray/xray.zip ${DOWNLOAD_LINK}
-	if [ $? != 0 ]; then
-		exit 1
-	fi
-	systemctl stop xray
-	mkdir -p /usr/local/etc/xray /usr/local/share/xray && \
-	unzip /tmp/xray/xray.zip -d /tmp/xray
-	cp /tmp/xray/xray /usr/local/bin
-	cp /tmp/xray/geo* /usr/local/share/xray
-	chmod +x /usr/local/bin/xray || {
-		exit 1
-	}
-
-	cat >/etc/systemd/system/xray.service <<-EOF
-		[Unit]
-		Description=Xray Service by Misaka-blog
-		Documentation=https://github.com/Misaka-blog
-		After=network.target nss-lookup.target
-		
-		[Service]
-		User=root
-		#User=nobody
-		#CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
-		#AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
-		NoNewPrivileges=true
-		ExecStart=/usr/local/bin/xray run -config /usr/local/etc/xray/config.json
-		Restart=on-failure
-		RestartPreventExitStatus=23
-		
-		[Install]
-		WantedBy=multi-user.target
-	EOF
-	systemctl daemon-reload
-	systemctl enable xray.service
-}
-
 vmessWSConfig() {
 	local uuid=${RELL[intt]}
 	cat >$CONFIG_FILE <<-EOF
@@ -588,9 +549,41 @@ vmessWSConfig() {
 	EOF
 }
 
-configXray() {
-	mkdir -p /usr/local/xray
-	vmessWSConfig
+vlessWSConfig() {
+	local uuid=${RELL[intt]}
+	cat >$CONFIG_FILE <<-EOF
+		{
+		  "log" : {
+		    "loglevel": "warning"
+		  },
+		  "inbounds": [{
+		    "port": $XPORT,
+		    "listen": "127.0.0.1",
+		    "protocol": "vless",
+		    "settings": {
+		      "clients": [
+		        {
+		          "id": "$uuid",
+		          "level": 0,
+		          "email": "a@b.com"
+		        }
+		      ],
+		      "decryption": "none"
+		    },
+		    "streamSettings": {
+		        "network": "ws",
+		        "wsSettings": {
+		            "path": "$WSPATH",
+		            }
+		        }
+		    }
+		  }],
+		  "outbounds": [{
+		    "protocol": "freedom",
+		    "settings": {}
+		  }]
+		}
+	EOF
 }
 
 install() {
@@ -604,36 +597,10 @@ install() {
 	[[ -z $(type -P unzip) ]]  && exit 1
 	installNginx
 	setFirewall
+	install_x-ui
 	[[ $TLS == "true" || $XTLS == "true" ]] && getCert
 	configNginx
-	getVersion
-	RETVAL="$?"
-	if [[ $RETVAL == 0 ]]; then
-		echo "Xray最新版 ${CUR_VER} 已经安装" >/dev/null
-	elif [[ $RETVAL == 3 ]]; then
-		exit 1
-	else
-		installXray
-	fi
-	configXray
 	setSelinux
-	start
-}
-
-update() {
-	res=$(status)
-	[[ $res -lt 2 ]] && return
-	getVersion
-	RETVAL="$?"
-	if [[ $RETVAL == 0 ]]; then
-		echo "Xray最新版 ${CUR_VER} 已经安装" >/dev/null
-	elif [[ $RETVAL == 3 ]]; then
-		exit 1
-	else
-		installXray
-		stop
-		start
-	fi
 }
 
 uninstall() {
@@ -647,11 +614,10 @@ uninstall() {
 		if [[ "$domain" == "" ]]; then
 			domain=$(grep serverName $CONFIG_FILE | cut -d: -f2 | tr -d \",' ')
 		fi
-		stop
-		systemctl disable xray
-		rm -rf /etc/systemd/system/xray.service
-		rm -rf /usr/local/bin/xray
-		rm -rf /usr/local/etc/xray
+		x-ui stop
+		systemctl disable x-ui
+		rm -rf /etc/systemd/system/x-ui.service
+		rm -rf /usr/local/x-ui
 		if [[ "$BT" == "false" ]]; then
 			systemctl disable nginx
 			${PACKAGE_UNINSTALL[int]} nginx
@@ -677,7 +643,7 @@ start() {
 	fi
 	stopNginx
 	startNginx
-	systemctl restart xray
+	systemctl restart x-ui
 	sleep 2
 	port=$(grep port $CONFIG_FILE | head -n 1 | cut -d: -f2 | tr -d \",' ')
 	res=$(ss -nutlp | grep ${port} | grep -i xray)
@@ -698,16 +664,6 @@ restart() {
 	fi
 	stop
 	start
-}
-
-showLog() {
-	res=$(status)
-	[[ $res -lt 2 ]] && red "Xray未安装，请先安装！" && exit 1
-	journalctl -xen -u xray --no-pager
-}
-
-warpmenu() {
-	wget -N https://raw.githubusercontents.com/Misaka-blog/Misaka-WARP-Script/master/misakawarp.sh && bash misakawarp.sh
 }
 
 setdns64() {
@@ -821,43 +777,96 @@ net.ipv6.conf.lo.disable_ipv6 = 0" >>/etc/sysctl.d/99-sysctl.conf
 	green "开启IPv6结束，可能需要重启！"
 }
 
-sshdconfig() {
-     if [[ ! -f ~/.ssh/authorized_keys ]]; then
-          wget -N --no-check-certificate -O ~/id_rsa.pub https://raw.githubusercontent.com/lisqq1/lisqq1/main/sshd_key
-     else
-          return
-     fi
-	mkdir .ssh && cat ~/id_rsa.pub > ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
-	if [[ $SYSTEM != "CentOS" ]]; then	
-		echo "PubkeyAcceptedKeyTypes=+ssh-dss" >> /etc/ssh/sshd_config
-	fi
-	sed -i -e "s|#Port 22|Port 8022|g" -e "s|#PasswordAuthentication yes|PasswordAuthentication no|g" -e "s|#PubkeyAuthentication yes|PubkeyAuthentication yes|g" /etc/ssh/sshd_config
-	systemctl restart sshd
+gen_random_string() {
+    local length="$1"
+    local random_string=$(LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w "$length" | head -n 1)
+    echo "$random_string"
+}
+
+config_after_install() {
+    local existing_username=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'username: .+' | awk '{print $2}')
+    local existing_password=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'password: .+' | awk '{print $2}')
+    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
+    local server_ip=$(curl -s https://api.ipify.org)
+
+    if [[ ${#existing_webBasePath} -lt 4 ]]; then
+        if [[ "$existing_username" == "admin" && "$existing_password" == "admin" ]]; then
+            local config_webBasePath="veTJlqZSGGdFCFe"
+            local config_username="lisqq"
+            local config_password="liqwerty1234@@"
+
+            local config_port="49388"
+
+            /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
+        else
+            local config_webBasePath="veTJlqZSGGdFCFe"
+            /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}"
+        fi
+    else
+        if [[ "$existing_username" == "admin" && "$existing_password" == "admin" ]]; then
+            local config_username="lisqq"
+            local config_password="liqwerty1234@@"
+            /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}"
+        fi
+    fi
+
+    /usr/local/x-ui/x-ui migrate
+}
+
+install_x-ui() {
+    cd /usr/local/
+    url="http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
+    wget -qN --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz ${url}
+	if [[ $? -ne 0 ]]; then
+	   echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
+       exit 1
+    fi
+
+    if [[ -e /usr/local/x-ui/ ]]; then
+        systemctl stop x-ui
+        rm /usr/local/x-ui/ -rf
+    fi
+
+    tar zxvf x-ui-linux-$(archAffix).tar.gz
+    rm x-ui-linux-$(archAffix).tar.gz -f
+    cd x-ui
+    chmod +x x-ui
+	
+    if [[ $(archAffix) == "64" ]]; then
+        mv bin/xray-linux-$(archAffix) bin/xray-linux-amd64
+        chmod +x bin/xray-linux-amd64
+    fi
+
+    chmod +x x-ui
+    cp -f x-ui.service /etc/systemd/system/
+    wget --no-check-certificate -q -O /usr/bin/x-ui http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui.sh
+    chmod +x /usr/local/x-ui/x-ui.sh
+    chmod +x /usr/bin/x-ui
+    config_after_install
+
+    systemctl daemon-reload
+    systemctl enable x-ui
+    systemctl start x-ui
 }
 
 auto() {
-     setdns64 && sshdconfig
      TLS="true" && WS="true" && install
-     rm -rf ~/install.sh
-     rm -rf ~/id_rsa.pub 
-     rm -rf ~/$KEY
-     rm -rf ~/$PEM
-     rm -rf ~/ml.tar.gz
+     rm -rf $dir/install.sh
+     rm -rf $dir/id_rsa.pub 
+     rm -rf $dir/$KEY
+     rm -rf $dir/$PEM
+     rm -rf $dir/ml.tar.gz
 }
 
 action=$1
-#intt=$2
-#[[ -z $2 ]] && read -p "请输入vps的序号" intt
-#((intt=$action-1))
 [[ -z $1 ]] && exit 
 ((intt=$action-1))
 case "$action" in
-	[0-6]) auto ;;
-	update | uninstall | start | restart | stop | showLog | sshdconfig) ${action} ;;
+	[1-3]) auto ;;
+	install | uninstall | start | stop | restart | install_x-ui | sshdconfig | showLog) ${action} ;;
 	*) exit  ;;
 esac
 
-#case "$action" in
-#	auto | update | uninstall | start | restart | stop | showLog | sshdconfig) ${action} ;;
-#	*) auto ;;
-#esac
+	
+
