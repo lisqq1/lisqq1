@@ -26,7 +26,8 @@ REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "amazon
 RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS")
 REL=("usuv.us.kg" "usur.us.kg" "lisqq.us.kg")
 #RELL=("7728e8d8-d065-4df4-f8bb-bc564913b6f9" "12d4281f-db3b-441c-b78d-41708a6c9978" "785a1d5a-036b-4102-8576-fd0f8e0c144b" "c77c7360-6d7f-4045-8146-8926dee4292a" "7c00e53f-8e6a-4a12-bd05-0403a29f17cf" "6810d320-44f8-49c0-9efb-ed9d4754967b")
-
+#定义下载链接路径
+url="http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main"
 # 定义常用命令和包管理器
 declare -A PACKAGE_UPDATE=(
   ["debian"]="apt -y update"
@@ -313,7 +314,7 @@ getData() {
         KEY="${DOMAIN}.key"
         
 		if [[ ! -f ml.tar.gz ]]; then
-			wget -qN --no-check-certificate "http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/ml.tar.gz"
+			wget -qN --no-check-certificate $url/ml.tar.gz
 		fi
         
         # 解压证书文件
@@ -482,7 +483,7 @@ configNginx() {
 
     # 下载并解压 fakesite.zip，仅当文件不存在时下载
     if [[ ! -f fakesite.zip ]]; then
-        wget -qN --no-check-certificate http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/fakesite.zip
+        wget -qN --no-check-certificate $url/fakesite.zip
         unzip -o fakesite.zip
         rm -f fakesite.zip
     fi
@@ -954,8 +955,7 @@ config_after_install() {
 # Install x-ui
 install_x-ui() {
     cd /usr/local/
-    url="http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui-linux-$(archAffix).tar.gz"
-    wget -qN --no-check-certificate -O "x-ui-linux-$(archAffix).tar.gz" "$url"
+    wget -qN --no-check-certificate -O "x-ui-linux-$(archAffix).tar.gz" $url/x-ui-linux-$(archAffix).tar.gz
 
     # Check download status
     if [[ $? -ne 0 ]]; then
@@ -986,7 +986,7 @@ install_x-ui() {
     cp -f x-ui.service /etc/systemd/system/
 
     # Download and setup x-ui script
-    wget --no-check-certificate -q -O /usr/bin/x-ui http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main/x-ui.sh
+    wget --no-check-certificate -q -O /usr/bin/x-ui $url/x-ui.sh
     chmod +x /usr/local/x-ui/x-ui.sh /usr/bin/x-ui
 
     # Configure settings after installation
@@ -997,7 +997,7 @@ sshdconfig() {
     local authorized_keys_file="$dir/.ssh/authorized_keys"
     local id_rsa_pub_file="$dir/id_rsa.pub"
     local sshd_config_file="/etc/ssh/sshd_config"
-    wget -N --no-check-certificate -O "$id_rsa_pub_file" "${url}sshd_key"
+    wget -N --no-check-certificate -O "$id_rsa_pub_file" $url/sshd_key
     # 下载公钥文件
 	if grep -q "20230529" "$authorized_keys_file"; then
 		#已改免密登录
