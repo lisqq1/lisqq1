@@ -27,7 +27,7 @@ RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS")
 REL=("usuv.us.kg" "usur.us.kg" "lisqq.us.kg")
 #RELL=("7728e8d8-d065-4df4-f8bb-bc564913b6f9" "12d4281f-db3b-441c-b78d-41708a6c9978" "785a1d5a-036b-4102-8576-fd0f8e0c144b" "c77c7360-6d7f-4045-8146-8926dee4292a" "7c00e53f-8e6a-4a12-bd05-0403a29f17cf" "6810d320-44f8-49c0-9efb-ed9d4754967b")
 #定义下载链接路径
-url="http://192.168.1.83:1688/v2"
+url="https://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main"
 # 定义常用命令和包管理器
 declare -A PACKAGE_UPDATE=(
   ["debian"]="apt -y update"
