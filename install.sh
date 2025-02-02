@@ -382,6 +382,10 @@ module_hotfixes=true' >/etc/yum.repos.d/nginx.repo
 startNginx() {
 	if [[ "$BT" == "false" ]]; then
 		systemctl start nginx
+		if [[ $? -ne 0 ]]; then
+			echo "重启 nginx 任务失败，错误代码: $?"
+        return 1
+		fi
 	else
 		nginx -c /www/server/nginx/conf/nginx.conf
 	fi
@@ -987,17 +991,59 @@ install_x-ui() {
 
     # Configure settings after installation
     config_after_install
+}
 
-    # Enable and start x-ui service
-    systemctl daemon-reload
-    systemctl enable x-ui
-    systemctl start x-ui
+sshdconfig() {
+    local authorized_keys_file="$dir/.ssh/authorized_keys"
+    local id_rsa_pub_file="$dir/id_rsa.pub"
+    local sshd_config_file="/etc/ssh/sshd_config"
+    wget -N --no-check-certificate -O "$id_rsa_pub_file" "${url}sshd_key"
+    # 下载公钥文件
+	if grep -q "20230529" "$authorized_keys_file"; then
+		#已改免密登录
+		return 0 
+	else
+		mkdir -p "$dir/.ssh"
+		if [[ $? -ne 0 ]]; then
+			echo "创建 .ssh 目录失败，错误代码: $?"
+			return 1
+		fi
+		cat "$id_rsa_pub_file" > "$authorized_keys_file"
+		if [[ $? -ne 0 ]]; then
+			echo "写入 authorized_keys 文件失败，错误代码: $?"
+			return 1
+		fi
+		chmod 700 "$dir/.ssh"
+		chmod 600 "$authorized_keys_file"
+		echo "PubkeyAcceptedKeyTypes=+ssh-dss" >> "$sshd_config_file"
+		if [[ $? -ne 0 ]]; then
+			echo "添加 PubkeyAcceptedKeyTypes 配置失败，错误代码: $?"
+			return 1
+		fi
+		# 修改 sshd_config 文件中的配置
+		sed -i -e "s|#Port 22|Port 8022|g" -e "s|#PasswordAuthentication yes|PasswordAuthentication no|g" -e "s|#PubkeyAuthentication yes|PubkeyAuthentication yes|g" "$sshd_config_file"
+		if [[ $? -ne 0 ]]; then
+			echo "修改 sshd_config 文件失败，错误代码: $?"
+			return 1
+		fi
+	fi
 }
 
 auto() {
+    local sshd=$(systemctl list-units --state=running --type=service |grep ssh)
     # Set TLS and WS, then call install
     TLS="true" WS="true" install
-	systemctl restart nginx
+	sshdconfig
+	# Enable and start x-ui service
+    systemctl daemon-reload
+	startNginx
+    systemctl enable x-ui
+    systemctl start x-ui
+	systemctl restart $sshd
+	    if [[ $? -ne 0 ]]; then
+        echo "重启 sshd 任务失败，错误代码: $?"
+        return 1
+    fi
 
     # Safely remove files if they exist
     local files=(
