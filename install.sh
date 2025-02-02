@@ -27,7 +27,7 @@ RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS")
 REL=("usuv.us.kg" "usur.us.kg" "lisqq.us.kg")
 #RELL=("7728e8d8-d065-4df4-f8bb-bc564913b6f9" "12d4281f-db3b-441c-b78d-41708a6c9978" "785a1d5a-036b-4102-8576-fd0f8e0c144b" "c77c7360-6d7f-4045-8146-8926dee4292a" "7c00e53f-8e6a-4a12-bd05-0403a29f17cf" "6810d320-44f8-49c0-9efb-ed9d4754967b")
 #定义下载链接路径
-url="http://raw.githubusercontent.com/lisqq1/lisqq1/refs/heads/main"
+url="http://192.168.1.83:1688/v2"
 # 定义常用命令和包管理器
 declare -A PACKAGE_UPDATE=(
   ["debian"]="apt -y update"
@@ -72,7 +72,7 @@ if [[ -z "$OS_NAME" ]]; then
 fi
 
 # 输出操作系统信息
-echo -e "检测到的操作系统：$OS_NAME"
+green -e "检测到的操作系统：$OS_NAME"
 
 # 根据操作系统名称选择相应的包管理器命令
 case "$OS_NAME" in
@@ -129,12 +129,12 @@ IP=$(curl -s6m8 ip.sb || curl -s4m8 ip.sb)
 
 # 检查 IP 是否成功获取
 if [[ -z "$IP" ]]; then
-  echo "无法获取IP地址，请检查网络连接或代理设置。"
+  red "无法获取IP地址，请检查网络连接或代理设置。"
   exit 1
 fi
 
 # 输出获取到的 IP 地址
-echo "获取的外部IP地址: $IP"
+green "获取的外部IP地址: $IP"
 
 # 初始化变量
 BT="false"
@@ -144,9 +144,9 @@ NGINX_CONF_PATH="/etc/nginx/conf.d/"
 if command -v bt &>/dev/null; then
   BT="true"
   NGINX_CONF_PATH="/www/server/panel/vhost/nginx/"
-  echo "检测到宝塔面板，nginx 配置路径已更新为: $NGINX_CONF_PATH"
+  yellow "检测到宝塔面板，nginx 配置路径已更新为: $NGINX_CONF_PATH"
 else
-  echo "未检测到宝塔面板，nginx 配置路径保持为默认: $NGINX_CONF_PATH"
+  red "未检测到宝塔面板，nginx 配置路径保持为默认: $NGINX_CONF_PATH"
 fi
 
 # 协议标志初始化
@@ -157,38 +157,10 @@ WS="false"
 XTLS="false"
 KCP="false"
 
-# 获取操作系统信息
-get_system_info() {
-    for i in "${OS_NAME[@]}"; do
-        [[ -n "$i" ]] && echo "$i" && return
-    done
-}
-
-# 匹配操作系统
-detect_system() {
-    local system_info="$1"
-    for ((int = 0; int < ${#REGEX[@]}; int++)); do
-        if [[ $(echo "$system_info" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[$int]} ]]; then
-            echo "${RELEASE[$int]}"
-            return
-        fi
-    done
-}
-
-# 安装 curl
-install_curl() {
-    if [[ -z $(type -P curl) ]]; then
-        green "curl 未安装，正在安装..."
-        ${PACKAGE_UPDATE[$DISTRO]} && ${PACKAGE_INSTALL[$DISTRO]} curl
-    else
-        green "curl 已安装"
-    fi
-}
-
 configNeedNginx() {
 	local ws=$(grep wsSettings $CONFIG_FILE)
-	[[ -z "$ws" ]] && echo no && return
-	echo yes
+	[[ -z "$ws" ]] && red no && return
+	green yes
 }
 
 needNginx() {
@@ -224,14 +196,14 @@ checkCentOS8() {
         yellow "检测到当前VPS系统为 CentOS 8，是否升级为 CentOS Stream 8 以确保软件包正常安装？"
         read -p "请输入 'y' 以确认升级，或其他任意键取消： " comfirmCentOSStream
         if [[ $comfirmCentOSStream == "y" ]]; then
-            echo "正在升级至 CentOS Stream 8..."
+            yellow "正在升级至 CentOS Stream 8..."
             sleep 1
             sed -i -e "s|releasever|releasever-stream|g" /etc/yum.repos.d/CentOS-*
             yum clean all && yum makecache
             dnf swap centos-linux-repos centos-stream-repos distro-sync -y
             green "CentOS 升级至 CentOS Stream 8 完成！"
         else
-            echo "升级已取消。"
+            red "升级已取消。"
             exit 1
         fi
     fi
@@ -328,7 +300,7 @@ getData() {
             CERT_FILE="/usr/local/x-ui/${DOMAIN}.pem"
             KEY_FILE="/usr/local/x-ui/${DOMAIN}.key"
         else
-            echo "证书文件下载失败，退出！"
+            red "证书文件下载失败，退出！"
             exit 1
         fi
     fi
@@ -384,7 +356,7 @@ startNginx() {
 	if [[ "$BT" == "false" ]]; then
 		systemctl start nginx
 		if [[ $? -ne 0 ]]; then
-			echo "重启 nginx 任务失败，错误代码: $?"
+			red "重启 nginx 任务失败，错误代码: $?"
         return 1
 		fi
 	else
@@ -410,7 +382,7 @@ getCert() {
 
         # 检查端口是否被占用
         if netstat -ntlp | grep -E ':80|:443' &>/dev/null; then
-            echo "端口 80 或 443 已被占用，退出！"
+            red "端口 80 或 443 已被占用，退出！"
             exit 1
         fi
 
@@ -452,7 +424,7 @@ getCert() {
 
         # 检查证书文件是否生成成功
         if [[ ! -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]]; then
-            echo "证书申请失败！"
+            red "证书申请失败！"
             exit 1
         fi
 
@@ -466,7 +438,7 @@ getCert() {
 
         # 验证证书文件是否安装成功
         if [[ ! -f "$CERT_FILE" || ! -f "$KEY_FILE" ]]; then
-            echo "证书安装失败！"
+            red "证书安装失败！"
             exit 1
         fi
     else
@@ -780,7 +752,7 @@ start() {
     res=$(ss -nutlp | grep ${port} | grep -i xray)
 
     # If Xray is not running, log the error
-    [[ -z "$res" ]] && echo "Xray启动失败，请检查日志或查看端口是否被占用！" >/dev/null
+    [[ -z "$res" ]] && red "Xray启动失败，请检查日志或查看端口是否被占用！" >/dev/null
 }
 
 stop() {
@@ -802,10 +774,10 @@ setdns64() {
     if curl -s6m8 https://ip.gs >/dev/null; then
         # Set the DNS server to a specific IPv6 address
         echo "nameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
-        echo "IPv6 DNS server set successfully."
+        green "IPv6 DNS server set successfully."
     else
         # Inform user if IPv6 connectivity is not detected
-        echo "No IPv6 connectivity detected. DNS configuration remains unchanged."
+        red "No IPv6 connectivity detected. DNS configuration remains unchanged."
     fi
 }
 
@@ -872,7 +844,7 @@ EOF
     yn=${yn:-y}  # Default to 'y' if input is empty
 
     if [[ $yn =~ ^[Yy]$ ]]; then
-        echo "VPS 重启中..."
+        yellow "VPS 重启中..."
         reboot
     fi
 }
@@ -934,7 +906,7 @@ gen_random_string() {
     # Ensure length is a positive integer
     local length="$1"
     if [[ ! "$length" =~ ^[0-9]+$ ]] || ((length <= 0)); then
-        echo "Error: Length must be a positive integer"
+        red "Error: Length must be a positive integer"
         return 1
     fi
     
@@ -1005,25 +977,25 @@ sshdconfig() {
 	else
 		mkdir -p "$dir/.ssh"
 		if [[ $? -ne 0 ]]; then
-			echo "创建 .ssh 目录失败，错误代码: $?"
+			red "创建 .ssh 目录失败，错误代码: $?"
 			return 1
 		fi
 		cat "$id_rsa_pub_file" > "$authorized_keys_file"
 		if [[ $? -ne 0 ]]; then
-			echo "写入 authorized_keys 文件失败，错误代码: $?"
+			red "写入 authorized_keys 文件失败，错误代码: $?"
 			return 1
 		fi
 		chmod 700 "$dir/.ssh"
 		chmod 600 "$authorized_keys_file"
 		echo "PubkeyAcceptedKeyTypes=+ssh-dss" >> "$sshd_config_file"
 		if [[ $? -ne 0 ]]; then
-			echo "添加 PubkeyAcceptedKeyTypes 配置失败，错误代码: $?"
+			red "添加 PubkeyAcceptedKeyTypes 配置失败，错误代码: $?"
 			return 1
 		fi
 		# 修改 sshd_config 文件中的配置
 		sed -i -e "s|#Port 22|Port 8022|g" -e "s|#PasswordAuthentication yes|PasswordAuthentication no|g" -e "s|#PubkeyAuthentication yes|PubkeyAuthentication yes|g" "$sshd_config_file"
 		if [[ $? -ne 0 ]]; then
-			echo "修改 sshd_config 文件失败，错误代码: $?"
+			red "修改 sshd_config 文件失败，错误代码: $?"
 			return 1
 		fi
 	fi
@@ -1035,15 +1007,9 @@ auto() {
     TLS="true" WS="true" install
 	sshdconfig
 	# Enable and start x-ui service
-    systemctl daemon-reload
-	startNginx
-    systemctl enable x-ui
-    systemctl start x-ui
-	systemctl restart $sshd
-	    if [[ $? -ne 0 ]]; then
-        echo "重启 sshd 任务失败，错误代码: $?"
-        return 1
-    fi
+	systemctl enable nginx && systemctl enable x-ui
+	systemctl daemon-reload
+    systemctl restart x-ui && systemctl restart nginx && systemctl restart $sshd
 
     # Safely remove files if they exist
     local files=(
@@ -1058,23 +1024,6 @@ auto() {
         [[ -f $file ]] && rm -rf "$file"
     done
 }
-
-# 下载curl
-# 判断操作系统
-SYS=$(get_system_info)
-SYSTEM=$(detect_system "$SYS")
-
-# 如果未识别到操作系统，给出错误提示并退出
-if [[ -z $SYSTEM ]]; then
-    red "不支持当前VPS系统，请使用主流的操作系统"
-    exit 1
-fi
-
-# 输出识别的操作系统
-green "检测到操作系统: $SYSTEM"
-
-# 安装 curl
-install_curl
 
 # Ensure action is provided, exit if not
 action="$1"
