@@ -286,7 +286,7 @@ getData() {
         KEY="${DOMAIN}.key"
         
 		if [[ ! -f ml.tar.gz ]]; then
-			wget -qN --no-check-certificate $url/ml.tar.gz
+			wget -qN --no-check-certificate --tries=10  $url/ml.tar.gz
 		fi
         
         # 解压证书文件
@@ -455,7 +455,7 @@ configNginx() {
 
     # 下载并解压 fakesite.zip，仅当文件不存在时下载
     if [[ ! -f fakesite.zip ]]; then
-        wget -qN --no-check-certificate $url/fakesite.zip
+        wget -qN --no-check-certificate --tries=10 $url/fakesite.zip
         unzip -o fakesite.zip
         rm -f fakesite.zip
     fi
@@ -927,7 +927,7 @@ config_after_install() {
 # Install x-ui
 install_x-ui() {
     cd /usr/local/
-    wget -qN --no-check-certificate -O "x-ui-linux-$(archAffix).tar.gz" $url/x-ui-linux-$(archAffix).tar.gz
+    wget -qN --no-check-certificate --tries=10 -O "x-ui-linux-$(archAffix).tar.gz" $url/x-ui-linux-$(archAffix).tar.gz
 
     # Check download status
     if [[ $? -ne 0 ]]; then
@@ -958,7 +958,7 @@ install_x-ui() {
     cp -f x-ui.service /etc/systemd/system/
 
     # Download and setup x-ui script
-    wget --no-check-certificate -q -O /usr/bin/x-ui $url/x-ui.sh
+    wget -qN --no-check-certificate --tries=10 -O /usr/bin/x-ui $url/x-ui.sh
     chmod +x /usr/local/x-ui/x-ui.sh /usr/bin/x-ui
 
     # Configure settings after installation
@@ -969,7 +969,7 @@ sshdconfig() {
     local authorized_keys_file="$dir/.ssh/authorized_keys"
     local id_rsa_pub_file="$dir/id_rsa.pub"
     local sshd_config_file="/etc/ssh/sshd_config"
-    wget -N --no-check-certificate -O "$id_rsa_pub_file" $url/sshd_key
+    wget -qN --no-check-certificate --tries=10 -O "$id_rsa_pub_file" $url/sshd_key
     # 下载公钥文件
 	if grep -q "20230529" "$authorized_keys_file"; then
 		#已改免密登录
